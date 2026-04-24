@@ -1,0 +1,10 @@
+{
+  "name": "sabrina-dashboard-v2",
+  "version": "1.0.0",
+  "description": "Sabrina Ops Command Center - Meubles Bonito",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": "20.x"
+  }
+}
