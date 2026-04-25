@@ -13,19 +13,16 @@ Ops Command Center for Meubles Bonito.
 - **Health** — Santé Sabrina
 
 ## Architecture
-- Auth simple cookie-based (24h)
+- Auth cookie-based signé HMAC-SHA256 (24h)
 - Dark mode via CSS variables
 - Source unique de vérité (`buildActionQueue()`)
 
 ## Authentification
 
-L'authentification utilise des sessions HTTP-only cookies signées (HMAC-SHA256).
-
-### Variables d'environnement requises (configurer sur Vercel)
-
-- `DASHBOARD_USERS` : liste séparée par virgules (ex: `Alice,Bob`)
+Variables d'environnement requises (configurer sur Vercel) :
+- `DASHBOARD_USERS` : liste séparée par virgules
 - `DASHBOARD_PASSWORD` : mot de passe partagé
-- `SESSION_SECRET` : chaîne aléatoire 32+ chars pour signer les cookies
+- `SESSION_SECRET` : chaîne aléatoire 32+ chars
 
 ### Tester
 
