@@ -2,13 +2,16 @@
 // MAIN — Entry point + routing
 // ─────────────────────────────────────────────
 
-import { initTheme, toggleTheme } from './theme.js';
+import { initTheme, toggleTheme, syncThemeIcon } from './theme.js';
 import { initAuthUI, logout } from './auth-ui.js';
 
 // Init theme avant tout (évite flash)
 initTheme();
 
 document.addEventListener('DOMContentLoaded', async () => {
+  // Sync theme icon maintenant que le DOM est prêt
+  syncThemeIcon();
+
   // Init auth (login UI ou dashboard direct si déjà connecté)
   await initAuthUI();
 
