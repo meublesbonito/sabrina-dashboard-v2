@@ -1,10 +1,10 @@
 {
   "version": 2,
   "rewrites": [
-    { "source": "/api/auth/login", "destination": "/api/auth/login" },
-    { "source": "/api/auth/logout", "destination": "/api/auth/logout" },
-    { "source": "/api/auth/me", "destination": "/api/auth/me" },
-    { "source": "/", "destination": "/public/index.html" },
-    { "source": "/(.*)", "destination": "/public/$1" }
-  ]
+    {
+      "source": "/((?!api/).*)",
+      "destination": "/public/$1"
+    }
+  ],
+  "cleanUrls": true
 }
