@@ -1,0 +1,118 @@
+/* ───────────────────────────────────────────── */
+/* DESIGN TOKENS — Light + Dark Mode             */
+/* ───────────────────────────────────────────── */
+
+:root[data-theme="light"] {
+  /* Backgrounds */
+  --bg:           #f8f9fa;
+  --bg-card:      #ffffff;
+  --bg-hover:     #f1f3f5;
+  --bg-subtle:    #f1f3f5;
+  --bg-input:     #ffffff;
+
+  /* Borders */
+  --border:       #e5e7eb;
+  --border-hover: #d1d5db;
+  --border-focus: #111827;
+
+  /* Text */
+  --text:         #111827;
+  --text-muted:   #6b7280;
+  --text-faint:   #9ca3af;
+  --text-inverse: #ffffff;
+
+  /* Semantic colors */
+  --red:          #dc2626;
+  --red-bg:       #fef2f2;
+  --red-border:   #fecaca;
+
+  --orange:       #f59e0b;
+  --orange-bg:    #fffbeb;
+  --orange-border:#fde68a;
+
+  --green:        #059669;
+  --green-bg:     #ecfdf5;
+  --green-border: #a7f3d0;
+
+  --blue:         #2563eb;
+  --blue-bg:      #eff6ff;
+  --blue-border:  #bfdbfe;
+
+  --gray:         #6b7280;
+  --gray-bg:      #f3f4f6;
+  --gray-border:  #e5e7eb;
+
+  /* Shadows (subtle) */
+  --shadow-sm:    0 1px 2px rgba(0,0,0,0.04);
+  --shadow-md:    0 1px 3px rgba(0,0,0,0.06), 0 1px 2px rgba(0,0,0,0.04);
+  --shadow-lg:    0 4px 12px rgba(0,0,0,0.08);
+}
+
+:root[data-theme="dark"] {
+  /* Backgrounds */
+  --bg:           #0a0b0d;
+  --bg-card:      #131519;
+  --bg-hover:     #1a1d23;
+  --bg-subtle:    #1a1d23;
+  --bg-input:     #1a1d23;
+
+  /* Borders */
+  --border:       #22262e;
+  --border-hover: #2d3138;
+  --border-focus: #f3f4f6;
+
+  /* Text */
+  --text:         #f3f4f6;
+  --text-muted:   #9ca3af;
+  --text-faint:   #6b7280;
+  --text-inverse: #0a0b0d;
+
+  /* Semantic colors */
+  --red:          #ef4444;
+  --red-bg:       rgba(239, 68, 68, 0.12);
+  --red-border:   rgba(239, 68, 68, 0.28);
+
+  --orange:       #fbbf24;
+  --orange-bg:    rgba(251, 191, 36, 0.12);
+  --orange-border:rgba(251, 191, 36, 0.28);
+
+  --green:        #34d399;
+  --green-bg:     rgba(52, 211, 153, 0.12);
+  --green-border: rgba(52, 211, 153, 0.28);
+
+  --blue:         #60a5fa;
+  --blue-bg:      rgba(96, 165, 250, 0.12);
+  --blue-border:  rgba(96, 165, 250, 0.28);
+
+  --gray:         #9ca3af;
+  --gray-bg:      rgba(156, 163, 175, 0.1);
+  --gray-border:  rgba(156, 163, 175, 0.2);
+
+  /* Shadows */
+  --shadow-sm:    0 1px 2px rgba(0,0,0,0.3);
+  --shadow-md:    0 2px 6px rgba(0,0,0,0.4);
+  --shadow-lg:    0 8px 24px rgba(0,0,0,0.5);
+}
+
+/* Spacing scale */
+:root {
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --space-10: 40px;
+  --space-12: 48px;
+
+  /* Border radius */
+  --radius-sm: 6px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+  --radius-xl: 16px;
+
+  /* Transitions */
+  --transition: all 0.15s cubic-bezier(0.4, 0, 0.2, 1);
+  --transition-slow: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
