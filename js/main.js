@@ -5,6 +5,7 @@
 import { initTheme, toggleTheme, syncThemeIcon } from './theme.js';
 import { initAuthUI, logout } from './auth-ui.js';
 import { initDemoMode } from './pages/demo.js';
+import { api } from './lib/api.js';
 
 // Init theme avant tout (évite flash)
 initTheme();
@@ -25,11 +26,15 @@ document.addEventListener('DOMContentLoaded', async () => {
     await logout();
   });
 
-  // Refresh
-  document.getElementById('refresh-btn')?.addEventListener('click', () => {
+  // Refresh button → ping API + update sync status
+  document.getElementById('refresh-btn')?.addEventListener('click', async () => {
     setSyncStatus('syncing');
-    setTimeout(() => setSyncStatus('ok'), 800);
-    // Au Lot 3 : appel API pour rafraîchir les données
+    const res = await api.ping();
+    if (res.ok) {
+      setSyncStatus('ok');
+    } else {
+      setSyncStatus('error', res.error || 'Erreur API');
+    }
   });
 
   // Navigation entre pages
