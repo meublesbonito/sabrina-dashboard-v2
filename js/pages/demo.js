@@ -1,7 +1,7 @@
 // ─────────────────────────────────────────────
 // DEMO — Mode debug ?demo=1
 // Debug preview : affiche tous les composants avec fake data
-// Supprimable sans casser l'app
+// + Section "Lot 4 — Action Queue" depuis fake datasets
 // ─────────────────────────────────────────────
 
 import { createFakeAction, ACTION_TYPES, PRIORITIES } from '../lib/action-shape.js';
@@ -13,6 +13,12 @@ import { renderErrorBanner } from '../components/error-banner.js';
 import { showModal } from '../components/modal.js';
 import { toast } from '../components/toast.js';
 import { renderCard } from '../components/card.js';
+
+// Lot 4 imports
+import { buildActionQueue } from '../lib/build-action-queue.js';
+import { FAKE_CONVOS } from '../lib/fixtures/fake-convos.js';
+import { FAKE_SIGNALS } from '../lib/fixtures/fake-signals.js';
+import { FAKE_ERRORS } from '../lib/fixtures/fake-errors.js';
 
 export function isDemoMode() {
   return new URL(location.href).searchParams.get('demo') === '1';
@@ -30,8 +36,52 @@ export function initDemoMode() {
   
   const titleEl = document.createElement('h2');
   titleEl.className = 'demo-title';
-  titleEl.textContent = '🧪 Mode Demo — Composants Lot 2';
+  titleEl.textContent = '🧪 Mode Demo — Composants Lot 2 + Action Queue Lot 4';
   wrap.appendChild(titleEl);
+  
+  // ═════════════════════════════════════════════
+  // LOT 4 — ACTION QUEUE (en premier, c'est le plus important)
+  // ═════════════════════════════════════════════
+  const sectionQueue = section('🔥 Lot 4 — Action Queue construite depuis fake datasets');
+  
+  const queue = buildActionQueue({
+    convos: FAKE_CONVOS,
+    signals: FAKE_SIGNALS,
+    errors: FAKE_ERRORS
+  });
+  
+  // Stats résumées
+  const stats = document.createElement('div');
+  stats.className = 'demo-row';
+  stats.style.cssText = 'background:var(--bg-subtle);padding:var(--space-3) var(--space-4);border-radius:var(--radius-md);font-size:12px;color:var(--text-muted);font-family:JetBrains Mono,monospace;';
+  stats.textContent = `Input : ${FAKE_CONVOS.length} convos + ${FAKE_SIGNALS.length} signaux  →  Output : ${queue.length} actions`;
+  sectionQueue.appendChild(stats);
+  
+  if (queue.length === 0) {
+    sectionQueue.appendChild(renderEmptyState({
+      icon: '✓',
+      title: 'Aucune action détectée',
+      description: 'Les fake datasets n\'ont généré aucune action.',
+      timestamp: new Date(),
+      tone: 'neutral'
+    }));
+  } else {
+    const cb = {
+      onCall: a => toast.success(`Appel ${a.phone}`),
+      onOpenBusinessSuite: a => toast.info('Ouvre Business Suite'),
+      onCopyFollowup: a => toast.success('Message copié'),
+      onConvert: a => toast.success(`✓ ${a.clientName} converti`),
+      onNoAnswer: a => showFollowupModal(a),
+      onLost: a => toast.error(`${a.clientName} marqué perdu`),
+      onDone: a => toast.success(`${a.clientName} traité`)
+    };
+    queue.forEach(action => sectionQueue.appendChild(renderActionRow(action, cb)));
+  }
+  wrap.appendChild(sectionQueue);
+  
+  // ═════════════════════════════════════════════
+  // LOT 2 — COMPOSANTS (en démo classique)
+  // ═════════════════════════════════════════════
   
   // 1. Action cards
   const section1 = section('1. ActionCards (KPI Today)');
@@ -44,8 +94,8 @@ export function initDemoMode() {
   section1.appendChild(grid);
   wrap.appendChild(section1);
   
-  // 2. Action rows
-  const section2 = section('2. ActionRow (queue Today)');
+  // 2. Action rows (avec fake actions)
+  const section2 = section('2. ActionRow (data hardcoded)');
   const cb = {
     onCall: a => toast.success(`Appel ${a.phone}`),
     onOpenBusinessSuite: a => toast.info('Ouvre Business Suite'),
