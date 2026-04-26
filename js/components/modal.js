@@ -45,8 +45,9 @@ export function showModal({ title = '', body = '', buttons = [] } = {}) {
     btn.className = `btn-modal btn-modal--${variant}`;
     btn.textContent = label;
     btn.type = 'button';
-    btn.addEventListener('click', () => {
-      const result = onClick ? onClick() : null;
+    btn.addEventListener('click', async () => {
+      const result = onClick ? await onClick() : null;
+      // Si onClick retourne false, on garde le modal ouvert
       if (result !== false) close();
     });
     footer.appendChild(btn);
