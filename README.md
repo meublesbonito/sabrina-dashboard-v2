@@ -34,3 +34,4 @@ Variables d'environnement requises (configurer sur Vercel) :
 ## Déploiement
 
 Push sur main → Vercel redéploie automatiquement.
+<!-- Force Vercel resync 2026-04-26 -->
