@@ -1,16 +1,11 @@
 // ─────────────────────────────────────────────
 // API CLIENT — Frontend
-// Wrapper simple pour fetch /api/data/*
-// Pas de cache, pas de retry — KISS
+// Wrapper pour fetch /api/data/* et /api/actions/*
 // ─────────────────────────────────────────────
 
-const BASE = '/api/data';
+const BASE = '/api';
 
-/**
- * Wrapper fetch avec gestion auth + erreurs.
- * @returns {Promise<{ok: boolean, data: any, count?: number, error?: string}>}
- */
-async function request(path, query = {}) {
+async function request(method, path, body = null, query = {}) {
   const params = new URLSearchParams();
   for (const [k, v] of Object.entries(query)) {
     if (v !== undefined && v !== null && v !== '') {
@@ -20,18 +15,24 @@ async function request(path, query = {}) {
   const qs = params.toString();
   const url = `${BASE}${path}${qs ? `?${qs}` : ''}`;
   
+  const init = {
+    method,
+    credentials: 'include',
+    headers: { 'Accept': 'application/json' }
+  };
+  
+  if (body !== null) {
+    init.headers['Content-Type'] = 'application/json';
+    init.body = JSON.stringify(body);
+  }
+  
   let response;
   try {
-    response = await fetch(url, {
-      method: 'GET',
-      credentials: 'include',
-      headers: { 'Accept': 'application/json' }
-    });
+    response = await fetch(url, init);
   } catch (err) {
     return { ok: false, error: 'Erreur réseau', data: null };
   }
   
-  // 401 = session expirée
   if (response.status === 401) {
     return { ok: false, error: 'Unauthorized', data: null, status: 401 };
   }
@@ -47,47 +48,31 @@ async function request(path, query = {}) {
 }
 
 export const api = {
-  /**
-   * Health-check : auth OK + Airtable OK
-   */
   ping() {
-    return request('/ping');
+    return request('GET', '/data/ping');
   },
   
-  /**
-   * Liste conversations (preview)
-   * @param {Object} opts - { limit, traite_status }
-   */
   getConvos(opts = {}) {
-    return request('/convos', opts);
+    return request('GET', '/data/convos', null, opts);
   },
   
-  /**
-   * Détail conversation complet
-   * @param {string} id - rec...
-   */
   getConvo(id) {
-    return request('/convo', { id });
+    return request('GET', '/data/convo', null, { id });
   },
   
-  /**
-   * Liste signaux
-   * @param {Object} opts - { limit, traite }
-   */
   getSignals(opts = {}) {
-    return request('/signals', opts);
+    return request('GET', '/data/signals', null, opts);
   },
   
-  /**
-   * Liste erreurs
-   * @param {Object} opts - { limit, resolved }
-   */
   getErrors(opts = {}) {
-    return request('/errors', opts);
+    return request('GET', '/data/errors', null, opts);
+  },
+  
+  updateAction(id, payload) {
+    return request('POST', '/actions/update', { id, ...payload });
   }
 };
 
-// Expose globalement pour debug console
 if (typeof window !== 'undefined') {
   window.api = api;
 }
