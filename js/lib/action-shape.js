@@ -5,12 +5,13 @@
 
 // Types d'actions (ordre = priorité business)
 export const ACTION_TYPES = {
-  CALL_NOW: 'call_now',             // 1. Achat immédiat (téléphone + intention)
-  FRUSTRATED: 'frustrated',          // 2. Client frustré/hostile
-  COD_CONFIRM: 'cod_confirm',        // 3. COD à confirmer
-  BOT_BLOCKED: 'bot_blocked',        // 4. Sabrina bloquée
-  ABANDONED_CART: 'abandoned_cart',  // 5. Panier abandonné
-  FOLLOWUP_DUE: 'followup_due'       // 6. Rappel échu après called_no_answer
+  CALL_NOW: 'call_now',                       // 1. Achat immédiat (téléphone + intention)
+  FRUSTRATED: 'frustrated',                    // 2. Client frustré/hostile
+  COD_CONFIRM: 'cod_confirm',                  // 3. COD à confirmer
+  BOT_BLOCKED: 'bot_blocked',                  // 4. Sabrina bloquée (boucle/incompréhension)
+  ABANDONED_CART: 'abandoned_cart',            // 5. Panier abandonné
+  FOLLOWUP_DUE: 'followup_due',                // 6. Rappel échu après called_no_answer
+  MESSENGER_FOLLOWUP: 'messenger_followup'     // 7. Relance Messenger (opportunité sans téléphone)
 };
 
 // Niveaux de priorité (mappés aux couleurs SLA)
@@ -37,7 +38,8 @@ export const ACTION_TYPE_LABELS = {
   cod_confirm: 'COD à confirmer',
   bot_blocked: 'Sabrina bloquée',
   abandoned_cart: 'Panier abandonné',
-  followup_due: 'Rappel à faire'
+  followup_due: 'Rappel à faire',
+  messenger_followup: 'Relance Messenger'
 };
 
 /**
