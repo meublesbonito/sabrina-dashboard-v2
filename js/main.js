@@ -4,40 +4,41 @@
 
 import { initTheme, toggleTheme, syncThemeIcon } from './theme.js';
 import { initAuthUI, logout } from './auth-ui.js';
-import { initDemoMode } from './pages/demo.js';
+import { initDemoMode, isDemoMode } from './pages/demo.js';
+import { initTodayPage } from './pages/today.js';
 import { api } from './lib/api.js';
+import { refreshNow } from './lib/queue-manager.js';
 
-// Init theme avant tout (évite flash)
 initTheme();
 
 document.addEventListener('DOMContentLoaded', async () => {
-  // Sync theme icon maintenant que le DOM est prêt
   syncThemeIcon();
-
-  // Init auth (login UI ou dashboard direct si déjà connecté)
   await initAuthUI();
 
-  // Theme toggle
   document.getElementById('theme-btn')?.addEventListener('click', toggleTheme);
 
-  // Logout
   document.getElementById('logout-btn')?.addEventListener('click', async () => {
     if (!confirm('Se déconnecter ?')) return;
     await logout();
   });
 
-  // Refresh button → ping API + update sync status
   document.getElementById('refresh-btn')?.addEventListener('click', async () => {
     setSyncStatus('syncing');
-    const res = await api.ping();
-    if (res.ok) {
+    
+    if (isDemoMode()) {
+      const res = await api.ping();
+      setSyncStatus(res.ok ? 'ok' : 'error', res.error);
+      return;
+    }
+    
+    try {
+      await refreshNow();
       setSyncStatus('ok');
-    } else {
-      setSyncStatus('error', res.error || 'Erreur API');
+    } catch (err) {
+      setSyncStatus('error', err.message);
     }
   });
 
-  // Navigation entre pages
   document.querySelectorAll('.nav-tab').forEach(tab => {
     tab.addEventListener('click', () => {
       const page = tab.dataset.page;
@@ -45,8 +46,22 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
   });
 
-  // Demo mode (?demo=1)
-  initDemoMode();
+  if (isDemoMode()) {
+    initDemoMode();
+  } else {
+    const isLoggedIn = !document.getElementById('dashboard')?.hidden;
+    if (isLoggedIn) {
+      initTodayPage();
+    } else {
+      const observer = new MutationObserver(() => {
+        if (!document.getElementById('dashboard')?.hidden) {
+          initTodayPage();
+          observer.disconnect();
+        }
+      });
+      observer.observe(document.getElementById('dashboard'), { attributes: true, attributeFilter: ['hidden'] });
+    }
+  }
 });
 
 function switchPage(pageName) {
@@ -57,7 +72,6 @@ function switchPage(pageName) {
   document.getElementById(`page-${pageName}`)?.classList.add('active');
 }
 
-// Sync status helper (utilisé par tous les Lots futurs)
 export function setSyncStatus(state, message) {
   const el = document.getElementById('sync-status');
   if (!el) return;
@@ -81,5 +95,4 @@ export function setSyncStatus(state, message) {
   }
 }
 
-// Expose globalement pour les autres modules
 window.setSyncStatus = setSyncStatus;
