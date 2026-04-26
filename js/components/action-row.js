@@ -17,10 +17,11 @@ import { renderSlaBadge } from './sla-badge.js';
 export function renderActionRow(action, callbacks = {}) {
   validateAction(action);
   
-  const row = document.createElement('div');
+const row = document.createElement('div');
   row.className = `action-row action-row--${action.priority || 'medium'}`;
   row.dataset.actionId = action.id || '';
   row.dataset.psid = action.psid || '';
+  row.dataset.actionType = action.actionType || '';
   
   // ─── COLONNE 1 : SLA badge ───
   const slaCol = document.createElement('div');
