@@ -4,6 +4,7 @@
 
 import { initTheme, toggleTheme, syncThemeIcon } from './theme.js';
 import { initAuthUI, logout } from './auth-ui.js';
+import { initDemoMode } from './pages/demo.js';
 
 // Init theme avant tout (évite flash)
 initTheme();
@@ -38,6 +39,9 @@ document.addEventListener('DOMContentLoaded', async () => {
       switchPage(page);
     });
   });
+
+  // Demo mode (?demo=1)
+  initDemoMode();
 });
 
 function switchPage(pageName) {
