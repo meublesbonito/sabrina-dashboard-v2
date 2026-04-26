@@ -10,6 +10,7 @@
 <link rel="stylesheet" href="/styles/tokens.css">
 <link rel="stylesheet" href="/styles/base.css">
 <link rel="stylesheet" href="/styles/components.css">
+<link rel="stylesheet" href="/styles/today.css">
 </head>
 <body>
 
@@ -42,32 +43,34 @@
 <div id="dashboard" class="dashboard" hidden>
 
   <!-- HEADER -->
-  <header class="header">
-    <div class="header-left">
-      <div class="brand">
-        <div class="brand-logo">S</div>
-        <div class="brand-text">
-          <span class="brand-name">Sabrina</span>
-          <span class="brand-sep">/</span>
-          <span class="brand-project">Meubles Bonito</span>
-        </div>
-      </div>
-      <div class="status-pill" id="status-pill">
-        <span class="status-dot"></span>
-        <span class="status-label">LIVE</span>
-      </div>
-      <div class="sync-status" id="sync-status">
-        <span class="sync-icon">↻</span>
-        <span class="sync-text">Synchronisation...</span>
+<header class="header">
+  <div class="header-left">
+    <div class="brand">
+      <div class="brand-logo">S</div>
+      <div class="brand-text">
+        <span class="brand-name">Sabrina</span>
+        <span class="brand-sep">/</span>
+        <span class="brand-project">Meubles Bonito</span>
       </div>
     </div>
-    <div class="header-right">
-      <span class="user-pill" id="current-user">—</span>
-      <button class="btn-icon" id="theme-btn" title="Changer le thème">🌙</button>
-      <button class="btn-icon" id="refresh-btn" title="Rafraîchir">↻</button>
-      <button class="btn-ghost" id="logout-btn">Déconnexion</button>
+    <div class="status-pill" id="status-pill">
+      <span class="status-dot"></span>
+      <span class="status-label">LIVE</span>
     </div>
-  </header>
+    <div class="sync-status" id="sync-status">
+      <span class="sync-icon">↻</span>
+      <span class="sync-text">Synchronisation...</span>
+    </div>
+
+    <span class="urgent-badge" id="urgent-count-badge" hidden></span>
+  </div>
+  <div class="header-right">
+    <span class="user-pill" id="current-user">—</span>
+    <button class="btn-icon" id="theme-btn" title="Changer le thème">🌙</button>
+    <button class="btn-icon" id="refresh-btn" title="Rafraîchir">↻</button>
+    <button class="btn-ghost" id="logout-btn">Déconnexion</button>
+  </div>
+</header>
 
   <!-- NAV -->
   <nav class="main-nav">
