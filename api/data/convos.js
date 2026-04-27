@@ -175,6 +175,39 @@ function buildSearchFormula(q) {
 }
 
 // ─────────────────────────────────────────────
+// Lot 8.3 — Sort + Filter mappings (server-side via Airtable)
+// ─────────────────────────────────────────────
+
+const DEFAULT_SORT = [{ field: 'Last Modified Time', direction: 'desc' }];
+
+const SORT_MAP = {
+  recent:        [{ field: 'last_message_time', direction: 'desc' }],
+  oldest:        [{ field: 'last_message_time', direction: 'asc'  }],
+  cart_desc:     [{ field: 'cart_value',        direction: 'desc' }],
+  messages_desc: [{ field: 'nb_messages',       direction: 'desc' }],
+  name_asc:      [{ field: 'customer_name',     direction: 'asc'  }]
+};
+
+function buildFilterFormula(filter) {
+  switch (filter) {
+    case 'active':             return `{status} = 'active'`;
+    case 'human_only':         return `{status} = 'human_only'`;
+    case 'with_cart':          return `{cart_value} > 0`;
+    case 'checkout_sent':      return `NOT({checkout_sent_at} = BLANK())`;
+    case 'checkout_completed': return `NOT({checkout_completed_at} = BLANK())`;
+    case 'with_phone':         return `LEN({customer_phone} & '') > 0`;
+    default:                   return null; // 'all' or unknown → no filter
+  }
+}
+
+function combineFormulas(...formulas) {
+  const present = formulas.filter(Boolean);
+  if (present.length === 0) return undefined;
+  if (present.length === 1) return present[0];
+  return `AND(${present.join(', ')})`;
+}
+
+// ─────────────────────────────────────────────
 // Handler
 // ─────────────────────────────────────────────
 
@@ -189,22 +222,68 @@ return safe('api/data/convos', res, async () => {
 
     // Lot 6 — optional multi-field search
     const search = String(req.query.search || '').trim().toLowerCase();
-    const filterByFormula = search ? buildSearchFormula(search) : undefined;
+    const searchFormula = search ? buildSearchFormula(search) : null;
 
-    // Lot 7.1 (DT1) — listRecords expects `maxRecords`, not `pageSize`.
-    // Lot 7.1 (DT7) — listRecords always returns an array, no need for the
-    // legacy `{ records, nextOffset }` shape compatibility code.
-    const records = await listRecords(TABLE, {
-      maxRecords: limit,
+    // Lot 8.3 — optional server-side filter
+    const filterParam = String(req.query.filter || '').trim().toLowerCase();
+    const filterFormula = buildFilterFormula(filterParam);
+
+    const filterByFormula = combineFormulas(searchFormula, filterFormula);
+
+    // Lot 8.3 — optional sort (defaults to Last Modified Time desc for back-compat)
+    const sortParam = String(req.query.sort || '').trim().toLowerCase();
+    const sort = SORT_MAP[sortParam] || DEFAULT_SORT;
+
+    // Lot 8.3 — optional pagination via Airtable offset token
+    const offset = String(req.query.offset || '').trim() || undefined;
+
+    // Lot 8.3 — Airtable's `maxRecords` is a hard cap with no continuation
+    // token; for pagination we use `pageSize` (capped at Airtable's max of
+    // 100) and loop until we have `limit` records or run out of pages. This
+    // preserves Today's `?limit=200` (single call from the client's POV
+    // returns up to 200) while enabling Load More for Clients (`limit=100`
+    // per page + offset for the next).
+    const result = await fetchUpToLimit({
       filterByFormula,
-      sort: [{ field: 'Last Modified Time', direction: 'desc' }]
-    });
+      sort
+    }, limit, offset);
 
     // Map + filter null (records that crashed inside mapConvo)
-    const data = records
+    const data = result.records
       .map(mapConvo)
       .filter(c => c !== null);
 
-    return ok(res, data);
+    return ok(res, data, { nextOffset: result.offset });
   });
+}
+
+async function fetchUpToLimit(baseOpts, limit, startOffset) {
+  const AIRTABLE_PAGE_MAX = 100;
+  const collected = [];
+  let currentOffset = startOffset;
+  let lastOffsetReturned = null;
+
+  while (collected.length < limit) {
+    const remaining = limit - collected.length;
+    const pageSize = Math.min(remaining, AIRTABLE_PAGE_MAX);
+
+    const r = await listRecords(TABLE, {
+      ...baseOpts,
+      pageSize,
+      offset: currentOffset,
+      returnPagination: true
+    });
+
+    collected.push(...r.records);
+    lastOffsetReturned = r.offset;
+
+    // No more pages, OR Airtable returned an empty page (defensive).
+    if (!r.offset || r.records.length === 0) break;
+    currentOffset = r.offset;
+  }
+
+  return {
+    records: collected.slice(0, limit),
+    offset: lastOffsetReturned
+  };
 }

@@ -18,46 +18,63 @@ function getBaseId() {
 }
 
 /**
- * Liste les records d'une table
+ * Liste les records d'une table.
+ *
  * @param {string} tableName - nom de la table (ex: "CONVERSATIONS")
- * @param {Object} options - { filterByFormula, sort, maxRecords, fields, view }
- * @returns {Array} - liste des records [{ id, fields, createdTime }]
+ * @param {Object} options
+ *   - filterByFormula  : Airtable formula string (optional)
+ *   - sort             : array of { field, direction } (optional)
+ *   - maxRecords       : cap per call (optional)
+ *   - fields           : array of field names to include (optional)
+ *   - view             : Airtable view name (optional)
+ *   - offset           : Airtable continuation token from a previous page (Lot 8.3, optional)
+ *   - returnPagination : if true, return `{records, offset}` instead of just `records`
+ *                        (Lot 8.3, additive — default behavior unchanged for existing callers)
+ *
+ * @returns {Array | { records: Array, offset: string|null }}
+ *   - default               → array of records (back-compat)
+ *   - returnPagination=true  → `{records, offset}` (offset is null when no more pages)
  */
 export async function listRecords(tableName, options = {}) {
   const baseId = getBaseId();
   const params = new URLSearchParams();
-  
+
   if (options.maxRecords) params.append('maxRecords', String(options.maxRecords));
+  if (options.pageSize)   params.append('pageSize',   String(options.pageSize));
+  if (options.offset)     params.append('offset',     String(options.offset));
   if (options.filterByFormula) params.append('filterByFormula', options.filterByFormula);
   if (options.view) params.append('view', options.view);
-  
+
   if (Array.isArray(options.sort)) {
     options.sort.forEach((s, i) => {
       params.append(`sort[${i}][field]`, s.field);
       params.append(`sort[${i}][direction]`, s.direction || 'asc');
     });
   }
-  
+
   if (Array.isArray(options.fields)) {
     options.fields.forEach(f => params.append('fields[]', f));
   }
-  
+
   const url = `${AIRTABLE_BASE}/${baseId}/${encodeURIComponent(tableName)}?${params.toString()}`;
-  
+
   const response = await fetch(url, {
     headers: {
       Authorization: `Bearer ${getToken()}`,
       'Content-Type': 'application/json'
     }
   });
-  
+
   if (!response.ok) {
     const text = await response.text().catch(() => '');
     console.error(`[Airtable] ${response.status} ${tableName}: ${text}`);
     throw new Error(`Airtable ${response.status}`);
   }
-  
+
   const json = await response.json();
+  if (options.returnPagination) {
+    return { records: json.records || [], offset: json.offset || null };
+  }
   return json.records || [];
 }
 
