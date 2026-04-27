@@ -6,6 +6,7 @@ import { initTheme, toggleTheme, syncThemeIcon } from './theme.js';
 import { initAuthUI, logout } from './auth-ui.js';
 import { initDemoMode, isDemoMode } from './pages/demo.js';
 import { initTodayPage } from './pages/today.js';
+import { initClientsPage } from './pages/clients.js';
 import { api } from './lib/api.js';
 import { refreshNow } from './lib/queue-manager.js';
 
@@ -70,6 +71,11 @@ function switchPage(pageName) {
 
   document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
   document.getElementById(`page-${pageName}`)?.classList.add('active');
+
+  // Lot 6 — lazy-init the Clients page on first visit
+  if (pageName === 'clients' && !isDemoMode()) {
+    initClientsPage();
+  }
 }
 
 export function setSyncStatus(state, message) {

@@ -103,7 +103,12 @@ const row = document.createElement('div');
   if (callbacks.onCopyFollowup) {
     buttons.push(makeBtn('btn-action btn-copy', '📋 Copier', () => callbacks.onCopyFollowup(action)));
   }
-  
+  // Lot 6 — Optional "Détails" button to open the read-only drawer.
+  // Stays opt-in via callback so demo / tests without onViewDrawer keep their existing button set.
+  if (callbacks.onViewDrawer) {
+    buttons.push(makeBtn('btn-action btn-view', '👁 Détails', () => callbacks.onViewDrawer(action)));
+  }
+
   // Séparateur visuel
   if (buttons.length > 0 && (callbacks.onConvert || callbacks.onNoAnswer || callbacks.onLost || callbacks.onDone)) {
     const sep = document.createElement('span');

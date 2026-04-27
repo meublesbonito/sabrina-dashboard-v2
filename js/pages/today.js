@@ -18,6 +18,7 @@ import {
   startAutoRefresh,
   isPending
 } from '../lib/queue-manager.js';
+import { openDrawerForConvo } from './clients.js';
 
 const LOST_REASONS = [
   { value: 'price_too_high', label: 'Prix trop cher' },
@@ -184,7 +185,11 @@ function makeCallbacks() {
     onConvert: handleConvert,
     onNoAnswer: handleNoAnswer,
     onLost: handleLost,
-    onDone: handleDone
+    onDone: handleDone,
+    // Lot 6 — open the read-only drawer with the same convo
+    onViewDrawer: (action) => {
+      openDrawerForConvo(action.id, { psid: action.psid, customer_name: action.clientName });
+    }
   };
 }
 
