@@ -102,11 +102,16 @@ export function openDrawer({ title = '', body = null, footer = null } = {}) {
 
   overlayEl.hidden = false;
   drawerEl.hidden = false;
-  // Trigger CSS animation by adding class on next frame
-  requestAnimationFrame(() => {
-    overlayEl.classList.add('drawer-overlay--open');
-    drawerEl.classList.add('drawer--open');
-  });
+  // Force a synchronous reflow so the browser commits the initial style
+  // (translateX(100%)) before we toggle the .drawer--open class. This makes
+  // the slide-in transition fire reliably regardless of rAF throttling
+  // (e.g. background tabs, low-power devices), which was the cause of the
+  // "Today drawer never appears" symptom: the drawer was created in the DOM
+  // but the open class was never applied so it stayed off-screen at
+  // translateX(100%).
+  void drawerEl.offsetWidth;
+  overlayEl.classList.add('drawer-overlay--open');
+  drawerEl.classList.add('drawer--open');
 
   document.body.classList.add('drawer-body-locked');
 

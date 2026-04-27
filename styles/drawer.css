@@ -273,6 +273,7 @@ body.drawer-body-locked { overflow: hidden; }
 .client-card-cart     { background: var(--green-bg);  color: var(--green);  border-color: var(--green-border); font-weight: 600; }
 .client-card-msg      { /* default chip styling, monospace count */ font-family: inherit; }
 .client-card-weak     { background: var(--orange-bg); color: var(--orange); border-color: var(--orange-border); font-weight: 600; }
+.client-card-ago      { /* default chip styling */ font-family: 'JetBrains Mono', monospace; }
 
 .client-card-status {
   margin-left: auto;
@@ -298,4 +299,82 @@ body.drawer-body-locked { overflow: hidden; }
 }
 .btn-action.btn-view:hover {
   background: var(--bg-hover);
+}
+
+/* ═══ Lot 6.2 — AI suggestion panel + footer divider + AI button ═══ */
+
+/* Slot lives at the top of the drawer body */
+.ai-suggestion-slot {
+  margin-bottom: var(--space-4);
+}
+
+.ai-suggestion-panel {
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius-md);
+  background: var(--blue-bg);
+  border: 1px solid var(--blue-border);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+.ai-suggestion-panel--loading,
+.ai-suggestion-panel--rate-limit {
+  background: var(--orange-bg);
+  border-color: var(--orange-border);
+}
+.ai-suggestion-panel--error {
+  background: var(--red-bg);
+  border-color: var(--red-border);
+}
+.ai-suggestion-panel--success {
+  background: var(--blue-bg);
+  border-color: var(--blue-border);
+}
+
+.ai-suggestion-meta {
+  font-size: 11px;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  font-weight: 600;
+}
+.ai-suggestion-text {
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--text);
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+.ai-suggestion-panel--error .ai-suggestion-text {
+  color: var(--red);
+}
+.ai-suggestion-actions {
+  display: flex;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+  margin-top: var(--space-1);
+}
+
+/* Visual separator between manual buttons and the AI button in the footer */
+.footer-divider {
+  width: 1px;
+  height: 28px;
+  background: var(--border);
+  display: inline-block;
+  margin: 0 var(--space-1);
+  align-self: center;
+}
+
+/* AI button — visually distinct (filled blue) */
+.btn-action.btn-ai {
+  background: var(--blue);
+  color: var(--text-inverse);
+  border: 1px solid var(--blue);
+}
+.btn-action.btn-ai:hover:not(:disabled) {
+  filter: brightness(0.95);
+}
+.btn-action.btn-ai:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
