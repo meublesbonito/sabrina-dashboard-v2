@@ -91,6 +91,12 @@ export const api = {
   // Lot 7.2 — Toggle traité flag on a single SIGNAUX record
   traiteSignal(id, traite) {
     return request('POST', '/actions/signal-traite', { id, traite });
+  },
+
+  // Lot 8.1 — Set the Sabrina dispatcher status on a single conversation
+  // (allowed values: 'active' | 'human_only')
+  setDispatch(id, status) {
+    return request('POST', '/actions/dispatch-control', { id, status });
   }
 };
 

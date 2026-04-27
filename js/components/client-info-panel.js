@@ -12,6 +12,8 @@
 import { renderConvoTimeline } from './convo-timeline.js';
 import { formatPhone, formatMoney } from '../lib/action-shape.js';
 import { api } from '../lib/api.js';
+import { showModal } from './modal.js';
+import { toast } from './toast.js';
 
 // Module-level reference: the AI button needs to render the suggestion into
 // the slot rendered at the top of the drawer body. Drawer is a singleton, so
@@ -89,13 +91,19 @@ export function renderClientInfoFooter(convo) {
   footer.className = 'client-info-footer';
   manualButtons.forEach(b => footer.appendChild(b));
 
-  // Lot 6.2 — AI button (visually separated by divider)
   if (convo.id) {
+    // Lot 8.1 — Stop / Reactivate Sabrina (visually separated by divider)
     if (manualButtons.length > 0) {
-      const divider = document.createElement('span');
-      divider.className = 'footer-divider';
-      footer.appendChild(divider);
+      const divider1 = document.createElement('span');
+      divider1.className = 'footer-divider';
+      footer.appendChild(divider1);
     }
+    footer.appendChild(makeDispatchButton(convo));
+
+    // Lot 6.2 — AI button (visually separated by another divider)
+    const divider2 = document.createElement('span');
+    divider2.className = 'footer-divider';
+    footer.appendChild(divider2);
 
     const aiBtn = document.createElement('button');
     aiBtn.type = 'button';
@@ -106,6 +114,116 @@ export function renderClientInfoFooter(convo) {
   }
 
   return footer;
+}
+
+// ─────────────────────────────────────────────
+// Lot 8.1 — Stop / Reactivate Sabrina dispatcher
+//
+// Reads `convo.status` to decide which label to show:
+//   - 'active' (or empty/null/undefined) → "⛔ Stop Sabrina" (target: human_only)
+//   - 'human_only'                       → "✅ Réactiver Sabrina" (target: active)
+//   - anything else (handed_off, closed,
+//     "carted + ..." automation values)  → button DISABLED with tooltip
+//
+// On click: shows a confirmation modal, then POSTs to /api/actions/dispatch-control.
+// Backend re-validates the current status to refuse overwriting custom values.
+// ─────────────────────────────────────────────
+
+const STOP_LABEL = '⛔ Stop Sabrina';
+const REACTIVATE_LABEL = '✅ Réactiver Sabrina';
+
+function makeDispatchButton(convo) {
+  const btn = document.createElement('button');
+  btn.type = 'button';
+
+  const status = convo.status;
+  const isCustom = !['active', 'human_only', '', null, undefined].includes(status);
+
+  if (isCustom) {
+    btn.className = 'btn-action btn-dispatch btn-dispatch--custom';
+    btn.textContent = STOP_LABEL;
+    btn.disabled = true;
+    btn.title = `Status géré par automation Sabrina (${status}) — ne pas écraser`;
+    return btn;
+  }
+
+  if (status === 'human_only') {
+    btn.className = 'btn-action btn-dispatch btn-dispatch--reactivate';
+    btn.textContent = REACTIVATE_LABEL;
+    btn.addEventListener('click', () => handleDispatchClick(convo, btn, 'active'));
+  } else {
+    btn.className = 'btn-action btn-dispatch btn-dispatch--stop';
+    btn.textContent = STOP_LABEL;
+    btn.addEventListener('click', () => handleDispatchClick(convo, btn, 'human_only'));
+  }
+  return btn;
+}
+
+function handleDispatchClick(convo, btn, targetStatus) {
+  const clientName = clientNameOf(convo);
+  const isStop = targetStatus === 'human_only';
+
+  const title = isStop ? 'Stop Sabrina ?' : 'Réactiver Sabrina ?';
+  const message = isStop
+    ? `Stop Sabrina sur ${clientName} ? Sabrina arrêtera de répondre à ce client. Tu devras reprendre manuellement.`
+    : `Réactiver Sabrina sur ${clientName} ? Sabrina pourra recommencer à répondre automatiquement.`;
+
+  const body = document.createElement('p');
+  body.className = 'modal-text';
+  body.textContent = message;
+
+  showModal({
+    title,
+    body,
+    buttons: [
+      { label: 'Annuler', variant: 'secondary', onClick: () => {} },
+      {
+        label: isStop ? 'Stop Sabrina' : 'Réactiver Sabrina',
+        variant: isStop ? 'danger' : 'primary',
+        onClick: async () => {
+          // Optimistic loading state on the original button
+          btn.disabled = true;
+          btn.textContent = '⏳ ...';
+
+          let res;
+          try {
+            res = await api.setDispatch(convo.id, targetStatus);
+          } catch {
+            toast.error('Erreur réseau — réessaye.');
+            restoreButton(btn, isStop ? STOP_LABEL : REACTIVATE_LABEL);
+            return;
+          }
+
+          if (!res || res.ok === false) {
+            // 409 Conflict carries `current_status` for the custom-status case
+            if (res && res.current_status) {
+              toast.error(`Status custom détecté (${res.current_status}) — non écrasé.`);
+              // Force a UI refresh by swapping the button to its custom-disabled state
+              convo.status = res.current_status;
+              const refreshed = makeDispatchButton(convo);
+              btn.replaceWith(refreshed);
+            } else {
+              toast.error(`Échec : ${res?.error || 'serveur'}`);
+              restoreButton(btn, isStop ? STOP_LABEL : REACTIVATE_LABEL);
+            }
+            return;
+          }
+
+          // Success — sync local convo state and swap the button to the inverse
+          convo.status = targetStatus;
+          const newBtn = makeDispatchButton(convo);
+          btn.replaceWith(newBtn);
+          toast.success(isStop ? 'Sabrina arrêtée sur ce client' : 'Sabrina réactivée sur ce client');
+        }
+      }
+    ]
+  });
+}
+
+function restoreButton(btn, label) {
+  if (!btn.isConnected) return;
+  btn.disabled = false;
+  btn.textContent = label;
 }
 
 // ─────────────────────────────────────────────
