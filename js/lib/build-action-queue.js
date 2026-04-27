@@ -12,6 +12,8 @@
 //   5. COD_CONFIRM        → paiement COD pas complété
 //   6. ABANDONED_CART     → panier ouvert
 //   7. MESSENGER_FOLLOWUP → opportunity sans téléphone
+//
+// Lot 5.1 : filtre ad-template / faux signaux Facebook
 // ─────────────────────────────────────────────
 
 import { ACTION_TYPES, STATUSES } from './action-shape.js';
@@ -46,6 +48,7 @@ const FRUSTRATION_KEYWORDS = [
 export function buildActionQueue({ convos = [], signals = [], errors = [] } = {}) {
   const candidates = [];
   const signalsByPsid = indexByPsid(signals);
+  const convosByPsid = indexConvosByPsid(convos);
   
   for (const convo of convos) {
     if (!convo || !convo.psid) continue;
@@ -64,14 +67,20 @@ export function buildActionQueue({ convos = [], signals = [], errors = [] } = {}
   // Déduplication par PSID
   const deduped = dedupeByPsid(candidates);
   
+  // ─── Lot 5.1 — Filtre ad-template / faux signaux d'achat ───
+  const filtered = deduped.filter(action => {
+    const convo = convosByPsid.get(action.psid);
+    return !isAdTemplateNoise(action, convo);
+  });
+  
   // Tri : priorité asc (CRITICAL = 0), puis waitMinutes desc
-  deduped.sort((a, b) => {
+  filtered.sort((a, b) => {
     const r = priorityRank(a.priority) - priorityRank(b.priority);
     if (r !== 0) return r;
     return (b.waitMinutes || 0) - (a.waitMinutes || 0);
   });
   
-  return deduped;
+  return filtered;
 }
 
 /**
@@ -231,6 +240,18 @@ function indexByPsid(signals) {
 }
 
 /**
+ * Index O(1) : PSID → convo (Lot 5.1).
+ */
+function indexConvosByPsid(convos) {
+  const map = new Map();
+  for (const c of convos) {
+    if (!c || !c.psid) continue;
+    map.set(c.psid, c);
+  }
+  return map;
+}
+
+/**
  * Construit l'objet Action conforme au shape Lot 2.
  */
 function makeAction(convo, { actionType, reason, phone, waitMinutes, signal }) {
@@ -264,4 +285,50 @@ function makeAction(convo, { actionType, reason, phone, waitMinutes, signal }) {
     businessSuiteUrl,
     status: convo.traite_status || STATUSES.OPEN
   };
+}
+
+// ─────────────────────────────────────────────
+// Lot 5.1 — Détection ad-template Facebook
+// ─────────────────────────────────────────────
+
+/**
+ * Détermine si une action est du bruit (ad-template Facebook sans engagement).
+ *
+ * 9 GARDE-FOUS ABSOLUS — jamais exclure si :
+ *   - téléphone détecté
+ *   - cart_value > 0
+ *   - draft_order_id
+ *   - checkout_sent_at
+ *   - checkout_completed_at
+ *   - confirmed_product_name
+ *   - confirmed_payment_method
+ *   - confirmed_budget
+ *   - invoice_url
+ *
+ * EXCLURE seulement si :
+ *   - aucun garde-fou
+ *   - ET (nb_messages_client < 3 OU nb_substantial_messages < 2)
+ */
+function isAdTemplateNoise(action, convo) {
+  if (!convo) return false; // sécurité : garde si pas trouvé
+  
+  // ─── 9 garde-fous business ───
+  if (action.phone) return false;
+  if (convo.cart_value && convo.cart_value > 0) return false;
+  if (convo.draft_order_id) return false;
+  if (convo.checkout_sent_at) return false;
+  if (convo.checkout_completed_at) return false;
+  if (convo.confirmed_product_name) return false;
+  if (convo.confirmed_payment_method) return false;
+  if (convo.confirmed_budget) return false;
+  if (convo.invoice_url) return false;
+  
+  // ─── Filtre engagement faible ───
+  const nbClient = convo.nb_messages_client || 0;
+  if (nbClient < 3) return true;
+  
+  const nbSubstantial = convo.nb_substantial_messages || 0;
+  if (nbSubstantial < 2) return true;
+  
+  return false;
 }
