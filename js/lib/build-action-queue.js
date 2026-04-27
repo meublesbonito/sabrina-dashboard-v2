@@ -194,7 +194,9 @@ function detectAction(convo, convoSignals) {
  * Calcule waitMinutes depuis last_message_time.
  */
 function computeWaitMinutes(convo) {
-  const ts = convo.last_message_time || convo.last_modified_time;
+  const lmt = convo.last_message_time, lmod = convo.last_modified_time;
+  const ts = (typeof lmt === 'string' ? lmt : lmt?.iso)
+          || (typeof lmod === 'string' ? lmod : lmod?.iso);
   if (!ts) return 0;
   try {
     const d = new Date(ts);
