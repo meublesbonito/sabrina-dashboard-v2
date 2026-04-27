@@ -21,14 +21,18 @@ export default async function handler(req, res) {
     const reqLimit = parseInt(req.query?.limit ?? '50', 10);
     const limit = Math.max(1, Math.min(reqLimit || 50, MAX_LIMIT));
     
-    // resolved est un single select : valeur 'checked' = traité
+    // Lot 7.2 — `resolved` is actually an Airtable CHECKBOX (returns 1/0,
+    // exposed as boolean true|undefined). The legacy single-select 'checked'
+    // formula never matched a checkbox, so the previous filter was a no-op
+    // and returned every record regardless of state.
     const resolvedFilter = (req.query?.resolved ?? 'false').toString().toLowerCase();
     let filterByFormula = '';
     if (resolvedFilter === 'false') {
-      filterByFormula = `NOT({resolved} = 'checked')`;
+      filterByFormula = `NOT({resolved})`;
     } else if (resolvedFilter === 'true') {
-      filterByFormula = `{resolved} = 'checked'`;
+      filterByFormula = `{resolved} = TRUE()`;
     }
+    // Any other value (e.g. 'all') leaves filterByFormula empty → no filter.
     
     const records = await listRecords(TABLE, {
       maxRecords: limit,
@@ -59,11 +63,11 @@ function toError(record) {
     errorMessage: f.error_message || null,
     timestamp: ts.iso,
     timestampRaw: ts.raw,
-    // Lot 7.1 (DT4) — Airtable stores `resolved` as a single-select with the
-    // single value 'checked' (or empty/null). Normalize to a clean boolean
-    // for downstream consumers; the raw select value is intentionally not
-    // exposed since no consumer needs it.
-    resolved: f.resolved === 'checked',
+    // Lot 7.2 — `resolved` is an Airtable CHECKBOX (returns boolean true,
+    // or undefined when not checked). Lot 7.1 incorrectly assumed it was a
+    // single-select with value 'checked', which silently coerced everything
+    // to false. We accept both shapes for forward/backward compatibility.
+    resolved: f.resolved === true || f.resolved === 'checked',
     conversationRecordId: firstLinkedId(f.conversation_record_id)
   };
 }

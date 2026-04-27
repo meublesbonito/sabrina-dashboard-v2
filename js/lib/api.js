@@ -81,6 +81,16 @@ export const api = {
   // Lot 6.2 — Suggest one operational action via OpenAI for a single conversation
   suggestAction(id) {
     return request('POST', '/ai/suggest-action', { id });
+  },
+
+  // Lot 7.2 — Toggle resolved flag on a single tblErrors record
+  resolveError(id, resolved) {
+    return request('POST', '/actions/error-resolve', { id, resolved });
+  },
+
+  // Lot 7.2 — Toggle traité flag on a single SIGNAUX record
+  traiteSignal(id, traite) {
+    return request('POST', '/actions/signal-traite', { id, traite });
   }
 };
 

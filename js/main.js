@@ -7,6 +7,7 @@ import { initAuthUI, logout } from './auth-ui.js';
 import { initDemoMode, isDemoMode } from './pages/demo.js';
 import { initTodayPage } from './pages/today.js';
 import { initClientsPage } from './pages/clients.js';
+import { initHealthPage } from './pages/health.js';
 import { api } from './lib/api.js';
 import { refreshNow } from './lib/queue-manager.js';
 
@@ -75,6 +76,10 @@ function switchPage(pageName) {
   // Lot 6 — lazy-init the Clients page on first visit
   if (pageName === 'clients' && !isDemoMode()) {
     initClientsPage();
+  }
+  // Lot 7.2 — lazy-init the Health page on first visit
+  if (pageName === 'health' && !isDemoMode()) {
+    initHealthPage();
   }
 }
 

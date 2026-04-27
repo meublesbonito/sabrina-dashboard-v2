@@ -1,0 +1,276 @@
+/* ─────────────────────────────────────────────
+   HEALTH — Lot 7.2
+   Page styles : toolbar, sections, funnel chart, error/signal rows,
+   filter toggle, loader/empty states. Uses tokens.css variables only.
+   ───────────────────────────────────────────── */
+
+/* ═══ Toolbar ═══ */
+.health-toolbar {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  justify-content: flex-end;
+  margin-bottom: var(--space-5);
+}
+.health-last-fetched {
+  font-size: 12px;
+  color: var(--text-muted);
+  font-family: 'JetBrains Mono', monospace;
+}
+.btn-refresh {
+  background: var(--bg-card);
+  color: var(--text);
+  border: 1px solid var(--border);
+}
+.btn-refresh:hover {
+  background: var(--bg-hover);
+  border-color: var(--border-hover);
+}
+
+/* ═══ Section ═══ */
+.health-section {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: var(--space-5) var(--space-6);
+  margin-bottom: var(--space-5);
+}
+.health-section-head {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-3);
+  margin-bottom: var(--space-3);
+}
+.health-section-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin: 0;
+}
+.health-section-counter {
+  font-size: 12px;
+  color: var(--text-muted);
+  font-family: 'JetBrains Mono', monospace;
+}
+.health-section-body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+.health-loader {
+  padding: var(--space-6);
+  text-align: center;
+  color: var(--text-muted);
+  font-size: 13px;
+}
+
+/* ═══ Filter toggle (3 buttons) ═══ */
+.health-filter-toggle {
+  display: inline-flex;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  margin-bottom: var(--space-3);
+}
+.health-filter-btn {
+  background: var(--bg-card);
+  color: var(--text-muted);
+  border: 0;
+  border-right: 1px solid var(--border);
+  padding: var(--space-2) var(--space-3);
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: var(--transition);
+  font-family: 'Inter', sans-serif;
+}
+.health-filter-btn:last-child { border-right: 0; }
+.health-filter-btn:hover { background: var(--bg-hover); color: var(--text); }
+.health-filter-btn--active {
+  background: var(--text);
+  color: var(--text-inverse);
+}
+.health-filter-btn--active:hover {
+  background: var(--text);
+  color: var(--text-inverse);
+}
+
+/* ═══ Funnel chart ═══ */
+.funnel-chart { display: flex; flex-direction: column; gap: var(--space-2); }
+.funnel-bars { display: flex; flex-direction: column; gap: var(--space-2); }
+.funnel-empty {
+  padding: var(--space-5);
+  text-align: center;
+  color: var(--text-faint);
+  font-style: italic;
+}
+.funnel-row {
+  display: grid;
+  grid-template-columns: 200px 1fr 180px;
+  align-items: center;
+  gap: var(--space-3);
+  font-size: 13px;
+}
+.funnel-label {
+  color: var(--text);
+  font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.funnel-bar-wrap {
+  background: var(--bg-subtle);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+  height: 18px;
+  border: 1px solid var(--border);
+}
+.funnel-bar {
+  height: 100%;
+  background: linear-gradient(90deg, var(--blue) 0%, var(--green) 100%);
+  border-radius: var(--radius-sm);
+  transition: width 0.3s ease-out;
+  min-width: 1px;
+}
+.funnel-numbers {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-2);
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 12px;
+  white-space: nowrap;
+}
+.funnel-count { color: var(--text); font-weight: 600; }
+.funnel-pct   { color: var(--text-muted); }
+.funnel-footnote {
+  margin-top: var(--space-3);
+  font-size: 11px;
+  color: var(--text-faint);
+  font-style: italic;
+  line-height: 1.4;
+}
+
+/* ═══ Error / Signal rows ═══ */
+.health-row {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: var(--space-3) var(--space-4);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  transition: var(--transition);
+}
+.health-row:hover { border-color: var(--border-hover); }
+.health-row--resolved { opacity: 0.6; }
+
+.health-row-head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+  font-size: 12px;
+}
+.health-row-type {
+  font-weight: 600;
+  color: var(--text);
+  font-family: 'JetBrains Mono', monospace;
+}
+.health-row-module {
+  font-size: 11px;
+  color: var(--text-muted);
+  background: var(--bg-subtle);
+  padding: 1px 6px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+}
+.health-row-grav {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  padding: 2px 8px;
+  border-radius: var(--radius-sm);
+  background: var(--gray-bg);
+  color: var(--gray);
+  border: 1px solid var(--gray-border);
+}
+.health-row-grav--high   { background: var(--red-bg);    color: var(--red);    border-color: var(--red-border); }
+.health-row-grav--medium { background: var(--orange-bg); color: var(--orange); border-color: var(--orange-border); }
+.health-row-grav--low    { background: var(--blue-bg);   color: var(--blue);   border-color: var(--blue-border); }
+.health-row-ago {
+  margin-left: auto;
+  font-size: 11px;
+  color: var(--text-faint);
+  font-family: 'JetBrains Mono', monospace;
+}
+.health-row-message {
+  font-size: 13px;
+  color: var(--text);
+  line-height: 1.4;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+.health-row-suggestion {
+  font-size: 12px;
+  color: var(--text-muted);
+  font-style: italic;
+  line-height: 1.4;
+  padding-left: var(--space-1);
+}
+
+.health-row--signal { border-left: 3px solid var(--gray); }
+.health-row--grav-high.health-row--signal   { border-left-color: var(--red); }
+.health-row--grav-medium.health-row--signal { border-left-color: var(--orange); }
+.health-row--grav-low.health-row--signal    { border-left-color: var(--blue); }
+
+.health-row-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+  margin-top: var(--space-1);
+}
+.health-row-psid {
+  font-size: 11px;
+  color: var(--text-faint);
+  font-family: 'JetBrains Mono', monospace;
+}
+
+/* ═══ Toggle buttons ═══ */
+.btn-toggle-treat {
+  background: var(--green-bg);
+  color: var(--green);
+  border: 1px solid var(--green-border);
+}
+.btn-toggle-treat:hover:not(:disabled) {
+  background: var(--green);
+  color: white;
+}
+.btn-toggle-untreat {
+  background: var(--bg-subtle);
+  color: var(--text-muted);
+  border: 1px solid var(--border);
+}
+.btn-toggle-untreat:hover:not(:disabled) {
+  background: var(--bg-hover);
+  color: var(--text);
+}
+.btn-toggle-treat:disabled,
+.btn-toggle-untreat:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* ═══ Responsive ═══ */
+@media (max-width: 720px) {
+  .funnel-row {
+    grid-template-columns: 1fr;
+    gap: var(--space-1);
+  }
+  .funnel-numbers {
+    grid-column: 1;
+    justify-content: flex-start;
+  }
+}
