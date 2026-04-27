@@ -76,6 +76,11 @@ export const api = {
   
   updateAction(id, payload) {
     return request('POST', '/actions/update', { id, ...payload });
+  },
+
+  // Lot 6.2 — Suggest one operational action via OpenAI for a single conversation
+  suggestAction(id) {
+    return request('POST', '/ai/suggest-action', { id });
   }
 };
 

@@ -92,6 +92,12 @@ export function renderClientCard(convo, onClick) {
     meta.appendChild(makeChip('client-card-msg', `💬 ${label}`));
   }
 
+  // Lot 6.2 polish — relative "il y a X" chip from last_message_time (or last_modified_time fallback)
+  const ago = formatRelativeTime(convo.last_message_time, convo.last_modified_time);
+  if (ago) {
+    meta.appendChild(makeChip('client-card-ago', `🕒 ${ago}`));
+  }
+
   // Weak engagement badge — purely client-side derivation
   if (isWeakEngagement(convo)) {
     meta.appendChild(makeChip('client-card-weak', '⚠ Faible engagement'));
@@ -158,6 +164,44 @@ function extractSnippet(preview, maxLen = SNIPPET_MAX_LEN) {
   if (!text) return '';
   if (text.length > maxLen) text = text.slice(0, maxLen - 1) + '…';
   return text;
+}
+
+/**
+ * Pick the freshest ISO timestamp from a normalized date object or string.
+ * Accepts { raw, iso } | string | null.
+ */
+function pickIso(d) {
+  if (!d) return null;
+  if (typeof d === 'string') return d;
+  if (typeof d === 'object' && d.iso) return d.iso;
+  return null;
+}
+
+/**
+ * Format relative time as "il y a X min" / "il y a Xh" / "il y a Xj".
+ * Returns null when no usable timestamp is available.
+ */
+function formatRelativeTime(primary, fallback) {
+  const iso = pickIso(primary) || pickIso(fallback);
+  if (!iso) return null;
+
+  let ts;
+  try {
+    ts = new Date(iso).getTime();
+  } catch {
+    return null;
+  }
+  if (isNaN(ts)) return null;
+
+  const diffMs = Date.now() - ts;
+  if (diffMs < 0) return 'à l\'instant'; // future / clock skew
+  const minutes = Math.floor(diffMs / 60_000);
+  if (minutes < 1) return 'à l\'instant';
+  if (minutes < 60) return `il y a ${minutes} min`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `il y a ${hours}h`;
+  const days = Math.floor(hours / 24);
+  return `il y a ${days}j`;
 }
 
 /**
