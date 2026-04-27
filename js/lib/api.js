@@ -55,11 +55,17 @@ export const api = {
   getConvos(opts = {}) {
     return request('GET', '/data/convos', null, opts);
   },
-  
+
+  // Lot 6 — multi-field search (name, phone, psid, city). Case-insensitive substring.
+  searchConvos(query, opts = {}) {
+    return request('GET', '/data/convos', null, { search: query, ...opts });
+  },
+
   getConvo(id) {
     return request('GET', '/data/convo', null, { id });
   },
-  
+
+  // Lot 6 — getSignals accepts opts.psid for drawer-scoped filtering
   getSignals(opts = {}) {
     return request('GET', '/data/signals', null, opts);
   },

@@ -20,19 +20,30 @@ export default async function handler(req, res) {
   return safe('api/data/signals', res, async () => {
     const reqLimit = parseInt(req.query?.limit ?? '100', 10);
     const limit = Math.max(1, Math.min(reqLimit || 100, MAX_LIMIT));
-    
+
     // Par défaut : retourne uniquement les non-traités
     const traite = (req.query?.traite ?? 'false').toString().toLowerCase();
-    let filterByFormula = '';
+    const filters = [];
     if (traite === 'false') {
-      filterByFormula = `NOT({traité} = TRUE())`;
+      filters.push(`NOT({traité} = TRUE())`);
     } else if (traite === 'true') {
-      filterByFormula = `{traité} = TRUE()`;
+      filters.push(`{traité} = TRUE()`);
     }
-    
+
+    // Lot 6 — optional psid filter for drawer (single conversation)
+    const psid = String(req.query?.psid ?? '').trim();
+    if (psid) {
+      const safePsid = psid.replace(/'/g, "\\'");
+      filters.push(`{psid} = '${safePsid}'`);
+    }
+
+    const filterByFormula = filters.length > 1
+      ? `AND(${filters.join(', ')})`
+      : (filters[0] || undefined);
+
     const records = await listRecords(TABLE, {
       maxRecords: limit,
-      filterByFormula: filterByFormula || undefined,
+      filterByFormula,
       sort: [
         { field: 'date_detection', direction: 'desc' }
       ]

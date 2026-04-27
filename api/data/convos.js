@@ -158,6 +158,23 @@ function mapConvo(record) {
 }
 
 // ─────────────────────────────────────────────
+// Lot 6 — Search formula (multi-field, case-insensitive substring)
+// ─────────────────────────────────────────────
+
+function buildSearchFormula(q) {
+  // Escape single quotes for Airtable formula
+  const safe = q.replace(/'/g, "\\'");
+  return `OR(
+    SEARCH('${safe}', LOWER({customer_name} & '')) > 0,
+    SEARCH('${safe}', LOWER({fb_first_name} & '')) > 0,
+    SEARCH('${safe}', LOWER({fb_last_name} & '')) > 0,
+    SEARCH('${safe}', LOWER({customer_phone} & '')) > 0,
+    SEARCH('${safe}', LOWER({psid} & '')) > 0,
+    SEARCH('${safe}', LOWER({customer_city} & '')) > 0
+  )`;
+}
+
+// ─────────────────────────────────────────────
 // Handler
 // ─────────────────────────────────────────────
 
@@ -171,9 +188,14 @@ return safe('api/data/convos', res, async () => {
     const limit = Math.min(parseInt(req.query.limit) || 100, 200);
     const offset = req.query.offset || undefined;
 
+    // Lot 6 — optional multi-field search
+    const search = String(req.query.search || '').trim().toLowerCase();
+    const filterByFormula = search ? buildSearchFormula(search) : undefined;
+
     const result = await listRecords(TABLE, {
       pageSize: limit,
       offset,
+      filterByFormula,
       sort: [{ field: 'Last Modified Time', direction: 'desc' }]
     });
 
