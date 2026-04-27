@@ -1,129 +1,161 @@
 // ─────────────────────────────────────────────
 // GET /api/data/convos
-// Liste des conversations pour Today/Clients
-// READ ONLY — context_preview seulement (500 chars)
-//
-// 3 statuts distincts à ne pas confondre :
-//   status            = état contrôle Sabrina (active/handed_off/human_only/closed)
-//   traite_status     = workflow dashboard (open/done/called_no_answer/converted/lost)
-//   conversion_status = funnel vente (POLLUÉ — pas source unique en Lot 4)
-//
-// Query params :
-//   ?limit=50              (max 200)
-//   ?traite_status=open    (filtre workflow dashboard)
+// Liste des conversations Airtable
 // ─────────────────────────────────────────────
 
 import { requireAuth } from '../_helpers/auth-check.js';
-import { ok, safe } from '../_helpers/api-response.js';
+import { ok, fail, safe } from '../_helpers/api-response.js';
 import { listRecords, normalizeDate } from '../_helpers/airtable.js';
 
 const TABLE = 'CONVERSATIONS';
-const MAX_LIMIT = 200;
-const PREVIEW_CHARS = 500;
 
-export default async function handler(req, res) {
-  const session = requireAuth(req, res);
-  if (!session) return;
-  
-  return safe('api/data/convos', res, async () => {
-    const reqLimit = parseInt(req.query?.limit ?? '50', 10);
-    const limit = Math.max(1, Math.min(reqLimit || 50, MAX_LIMIT));
-    
-    // Filtre sur traite_status (workflow dashboard), PAS status (contrôle Sabrina)
-    const traiteStatusFilter = (req.query?.traite_status || '').toString().trim();
-    
-    let filterByFormula = '';
-    if (traiteStatusFilter) {
-      const safeVal = traiteStatusFilter.replace(/'/g, '');
-      filterByFormula = `{traite_status} = '${safeVal}'`;
-    }
-    
-    const records = await listRecords(TABLE, {
-      maxRecords: limit,
-      filterByFormula: filterByFormula || undefined,
-      sort: [
-        { field: 'last_message_time', direction: 'desc' },
-        { field: 'Last Modified Time', direction: 'desc' }
-      ]
-    });
-    
-    const data = records.map(toConvoSummary);
-    return ok(res, data, { count: data.length });
-  });
-}
+// ─────────────────────────────────────────────
+// Lot 5.1 — Détection messages substantiels
+// ─────────────────────────────────────────────
+
+const SUBSTANTIAL_KEYWORDS = [
+  // Engagement explicite
+  'oui', 'je prends', 'ok',
+  // Prix / budget
+  'combien', 'prix', 'cher', 'budget', 'coute', 'coût',
+  // Logistique
+  'livraison', 'livrer', 'apporter', 'transport',
+  'adresse', 'magasin', 'visite', 'passer', 'venir',
+  // Disponibilité
+  'disponible', 'dispo', 'quand', "aujourd'hui", 'demain',
+  // Finalisation
+  'confirme', 'paiement', 'payer', 'affirm', 'cod',
+  // Contact
+  'téléphone', 'numéro', 'mon nom', 'tel'
+];
+
+const PHONE_REGEX = /\d{3}[-.\s]?\d{3}[-.\s]?\d{4}/;
 
 /**
- * Mappe un record Airtable vers la version "summary" (liste).
- * context_window tronqué à 500 chars (preview).
- * Le record complet est disponible via /api/data/convo?id=...
+ * Analyse le context_window pour compter :
+ *   - nbClient : nombre de messages client
+ *   - nbSubstantial : nombre de messages substantiels
+ *
+ * Un message est substantiel si AU MOINS UN :
+ *   - Plus de 4 mots
+ *   - Contient un téléphone (regex)
+ *   - Contient un mot-clé fort (case-insensitive)
+ *
+ * Mots-clés faibles RETIRÉS (auto-loop avec templates Facebook) :
+ *   - "je veux", "acheter", "commander", "réserver"
  */
-function toConvoSummary(record) {
-  const f = record.fields || {};
-  const lastMsg = normalizeDate(f.last_message_time);
-  const modified = normalizeDate(f['Last Modified Time']);
-  const cartCreated = normalizeDate(f.cart_created_at);
-  const checkoutSent = normalizeDate(f.checkout_sent_at);
-  const checkoutCompleted = normalizeDate(f.checkout_completed_at);
-  const conversationStarted = normalizeDate(f.conversation_started_at);
-  const traiteAt = normalizeDate(f.traite_at);
-  const nextFollowupAt = normalizeDate(f.next_followup_at);
-  
+function analyzeContextWindow(contextWindow) {
+  if (!contextWindow || typeof contextWindow !== 'string') {
+    return { nbClient: 0, nbSubstantial: 0 };
+  }
+
+  // Split sur "CLIENT:" pour isoler chaque message client
+  const parts = contextWindow.split(/CLIENT:/i);
+  const clientMessages = parts.slice(1).map(part => {
+    // Tronque au prochain "BOT:" ou "|||"
+    const idxBot = part.indexOf('BOT:');
+    const idxSep = part.indexOf('|||');
+    const cuts = [idxBot, idxSep].filter(i => i !== -1);
+    const cutAt = cuts.length ? Math.min(...cuts) : -1;
+    return cutAt === -1 ? part.trim() : part.slice(0, cutAt).trim();
+  });
+
+  const nbClient = clientMessages.length;
+
+  let nbSubstantial = 0;
+  for (const msg of clientMessages) {
+    if (!msg) continue;
+    const lowerMsg = msg.toLowerCase();
+    const wordCount = msg.split(/\s+/).filter(w => w.length > 0).length;
+
+    const isSubstantial =
+      wordCount > 4 ||
+      PHONE_REGEX.test(msg) ||
+      SUBSTANTIAL_KEYWORDS.some(kw => lowerMsg.includes(kw));
+
+    if (isSubstantial) nbSubstantial++;
+  }
+
+  return { nbClient, nbSubstantial };
+}
+
+// ─────────────────────────────────────────────
+// Mapping Airtable → API response
+// ─────────────────────────────────────────────
+
+function mapConvo(record) {
+  const fields = record.fields || {};
+  const { nbClient, nbSubstantial } = analyzeContextWindow(fields.context_window);
+
   return {
     id: record.id,
-    psid: f.psid || null,
-    platform: f.platform || null,
-    
-    // Identité
-    fb_first_name: f.fb_first_name || null,
-    fb_last_name: f.fb_last_name || null,
-    customer_name: f.customer_name || null,
-    customer_phone: f.customer_phone || null,
-    customer_city: f.customer_city || null,
-    customer_province: f.customer_province || null,
-    customer_zip: f.customer_zip || null,
-    
-    // Conversation
-    nb_messages: f.nb_messages || 0,
-    last_action: f.last_action || null,
-    last_message_time: lastMsg.iso,
-    last_message_time_raw: lastMsg.raw,
-    last_modified_time: modified.iso,
-    last_modified_time_raw: modified.raw,
-    conversation_started_at: conversationStarted.iso,
-    
-    // Preview du context_window (pas le full)
-    context_preview: typeof f.context_window === 'string'
-      ? f.context_window.slice(0, PREVIEW_CHARS)
-      : null,
-    
-    // 3 statuts distincts (cf. en-tête)
-    status: f.status || null,                       // contrôle Sabrina
-    sales_stage: f.sales_stage || null,
-    conversion_status: f.conversion_status || null, // funnel vente (pollué)
-    opp_status: f.opp_status || null,
-    
-    // Panier / commande
-    cart_value: typeof f.cart_value === 'number' ? f.cart_value : (parseFloat(f.cart_value) || null),
-    cart_created_at: cartCreated.iso,
-    checkout_sent_at: checkoutSent.iso,
-    checkout_completed_at: checkoutCompleted.iso,
-    draft_order_id: f.draft_order_id || null,
-    invoice_url: f.invoice_url || null,
-    
-    // Préférences confirmées
-    confirmed_category: f.confirmed_category || null,
-    confirmed_product_name: f.confirmed_product_name || null,
-    confirmed_product_id: f.confirmed_product_id || null,
-    confirmed_budget: f.confirmed_budget || null,
-    confirmed_size: f.confirmed_size || null,
-    confirmed_payment_method: f.confirmed_payment_method || null,
-    
-    // Workflow dashboard (Lot 1 schema)
-    traite_status: f.traite_status || null,         // workflow dashboard
-    traite_by: f.traite_by || null,
-    traite_at: traiteAt.iso,
-    traite_action: f.traite_action || null,
-    next_followup_at: nextFollowupAt.iso,
-    traite_note: f.traite_note || null
+    psid: fields.psid || '',
+    platform: fields.platform || 'messenger',
+    fb_first_name: fields.fb_first_name || '',
+    fb_last_name: fields.fb_last_name || '',
+    customer_name: fields.customer_name || '',
+    customer_phone: fields.customer_phone || '',
+    customer_city: fields.customer_city || '',
+    customer_province: fields.customer_province || '',
+    customer_zip: fields.customer_zip || '',
+    nb_messages: fields.nb_messages || 0,
+    last_action: fields.last_action || '',
+    all_actions: fields.all_actions || '',
+    context_preview: (fields.context_window || '').slice(0, 500),
+    last_message_time: normalizeDate(fields.last_message_time),
+    last_modified_time: normalizeDate(fields['Last Modified Time']),
+    conversation_started_at: normalizeDate(fields.conversation_started_at),
+    status: fields.status || 'active',
+    conversion_status: fields.conversion_status || '',
+    sales_stage: fields.sales_stage || '',
+    opp_status: fields.opp_status || '',
+    cart_value: fields.cart_value || 0,
+    cart_created_at: normalizeDate(fields.cart_created_at),
+    checkout_sent_at: normalizeDate(fields.checkout_sent_at),
+    checkout_completed_at: normalizeDate(fields.checkout_completed_at),
+    draft_order_id: fields.draft_order_id || '',
+    invoice_url: fields.invoice_url || '',
+    confirmed_category: fields.confirmed_category || '',
+    confirmed_budget: fields.confirmed_budget || '',
+    confirmed_size: fields.confirmed_size || '',
+    confirmed_firmness: fields.confirmed_firmness || '',
+    confirmed_product_name: fields.confirmed_product_name || '',
+    confirmed_product_id: fields.confirmed_product_id || '',
+    confirmed_payment_method: fields.confirmed_payment_method || '',
+    traite_status: fields.traite_status || 'open',
+    traite_by: fields.traite_by || '',
+    traite_at: normalizeDate(fields.traite_at),
+    traite_action: fields.traite_action || '',
+    next_followup_at: normalizeDate(fields.next_followup_at),
+    traite_note: fields.traite_note || '',
+    // ⭐ Lot 5.1 — Calculés côté API
+    nb_messages_client: nbClient,
+    nb_substantial_messages: nbSubstantial
   };
+}
+
+// ─────────────────────────────────────────────
+// Handler
+// ─────────────────────────────────────────────
+
+export default async function handler(req, res) {
+  if (req.method !== 'GET') return fail(res, 405, 'GET only');
+
+  const session = requireAuth(req, res);
+  if (!session) return;
+
+  return safe('api/data/convos', res, async () => {
+    const limit = Math.min(parseInt(req.query.limit) || 100, 200);
+    const offset = req.query.offset || undefined;
+
+    const { records, nextOffset } = await listRecords(TABLE, {
+      pageSize: limit,
+      offset,
+      sort: [{ field: 'Last Modified Time', direction: 'desc' }]
+    });
+
+    const data = records.map(mapConvo);
+
+    return ok(res, data, { nextOffset });
+  });
 }
