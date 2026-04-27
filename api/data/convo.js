@@ -1,126 +1,148 @@
 // ─────────────────────────────────────────────
-// GET /api/data/convo?id=recXXXX
-// Détail complet d'une conversation (avec context_window full)
-// MVP : id seulement (pas de psid lookup)
-//
-// 3 statuts distincts (cf. /api/data/convos pour explication) :
-//   status, traite_status, conversion_status
+// GET /api/data/convos
+// Liste des conversations Airtable
 // ─────────────────────────────────────────────
 
 import { requireAuth } from '../_helpers/auth-check.js';
 import { ok, fail, safe } from '../_helpers/api-response.js';
-import { getRecord, normalizeDate } from '../_helpers/airtable.js';
+import { listRecords, normalizeDate, firstLinkedId } from '../_helpers/airtable.js';
 
 const TABLE = 'CONVERSATIONS';
 
-export default async function handler(req, res) {
-  const session = requireAuth(req, res);
-  if (!session) return;
-  
-  return safe('api/data/convo', res, async () => {
-    const id = (req.query?.id || '').toString().trim();
-    
-    if (!id) {
-      return fail(res, 400, 'Paramètre id requis (recXXXX)');
-    }
-    
-    if (!id.startsWith('rec')) {
-      return fail(res, 400, 'id doit commencer par "rec"');
-    }
-    
-    const record = await getRecord(TABLE, id);
-    
-    if (!record) {
-      return fail(res, 404, 'Conversation introuvable');
-    }
-    
-    return ok(res, toConvoFull(record));
-  });
-}
+// ─── Mots-clés substantiels (Lot 5.1) ───
+const SUBSTANTIAL_KEYWORDS = [
+  // Engagement explicite
+  'oui', 'je prends', 'ok',
+  // Prix / budget
+  'combien', 'prix', 'cher', 'budget', 'coute', 'coût',
+  // Logistique
+  'livraison', 'livrer', 'apporter', 'transport',
+  'adresse', 'magasin', 'visite', 'passer', 'venir',
+  // Disponibilité
+  'disponible', 'dispo', 'quand', "aujourd'hui", 'demain',
+  // Finalisation
+  'confirme', 'paiement', 'payer', 'affirm', 'cod',
+  // Contact
+  'téléphone', 'numéro', 'mon nom', 'tel'
+];
+
+const PHONE_REGEX = /\d{3}[-.\s]?\d{3}[-.\s]?\d{4}/;
 
 /**
- * Mappe un record en version FULL (context_window complet, all_actions, etc.)
+ * Analyse le context_window pour compter :
+ * - nbClient : nombre total de messages client
+ * - nbSubstantial : nombre de messages "substantiels"
+ *
+ * Un message est substantiel si AU MOINS UN :
+ * - Plus de 4 mots
+ * - Contient un téléphone (regex)
+ * - Contient un mot-clé fort (case-insensitive)
  */
-function toConvoFull(record) {
-  const f = record.fields || {};
-  const lastMsg = normalizeDate(f.last_message_time);
-  const modified = normalizeDate(f['Last Modified Time']);
-  const cartCreated = normalizeDate(f.cart_created_at);
-  const checkoutSent = normalizeDate(f.checkout_sent_at);
-  const checkoutCompleted = normalizeDate(f.checkout_completed_at);
-  const conversationStarted = normalizeDate(f.conversation_started_at);
-  const traiteAt = normalizeDate(f.traite_at);
-  const nextFollowupAt = normalizeDate(f.next_followup_at);
-  const dateAnalyse = normalizeDate(f.date_derniere_analyse);
-  const cancelledAt = normalizeDate(f.cancelled_at);
-  const fulfilledAt = normalizeDate(f.fulfilled_at);
-  
+function analyzeContextWindow(contextWindow) {
+  if (!contextWindow || typeof contextWindow !== 'string') {
+    return { nbClient: 0, nbSubstantial: 0 };
+  }
+
+  // Split sur "CLIENT:" pour isoler chaque message client
+  const parts = contextWindow.split(/CLIENT:/i);
+  // parts[0] = avant le 1er CLIENT, parts[1..n] = messages client
+  const clientMessages = parts.slice(1).map(part => {
+    // Tronque au prochain "BOT:" ou "|||"
+    const idxBot = part.indexOf('BOT:');
+    const idxSep = part.indexOf('|||');
+    const cuts = [idxBot, idxSep].filter(i => i !== -1);
+    const cutAt = cuts.length ? Math.min(...cuts) : -1;
+    return cutAt === -1 ? part.trim() : part.slice(0, cutAt).trim();
+  });
+
+  const nbClient = clientMessages.length;
+
+  let nbSubstantial = 0;
+  for (const msg of clientMessages) {
+    if (!msg) continue;
+    const lowerMsg = msg.toLowerCase();
+    const wordCount = msg.split(/\s+/).filter(w => w.length > 0).length;
+
+    const isSubstantial =
+      wordCount > 4 ||
+      PHONE_REGEX.test(msg) ||
+      SUBSTANTIAL_KEYWORDS.some(kw => lowerMsg.includes(kw));
+
+    if (isSubstantial) nbSubstantial++;
+  }
+
+  return { nbClient, nbSubstantial };
+}
+
+function mapConvo(record) {
+  const fields = record.fields || {};
+  const { nbClient, nbSubstantial } = analyzeContextWindow(fields.context_window);
+
   return {
     id: record.id,
-    psid: f.psid || null,
-    platform: f.platform || null,
-    
-    // Identité complète
-    fb_first_name: f.fb_first_name || null,
-    fb_last_name: f.fb_last_name || null,
-    customer_name: f.customer_name || null,
-    customer_phone: f.customer_phone || null,
-    customer_address: f.customer_address || null,
-    customer_city: f.customer_city || null,
-    customer_province: f.customer_province || null,
-    customer_zip: f.customer_zip || null,
-    shopify_customer_id: f.shopify_customer_id || null,
-    
-    // Conversation FULL
-    nb_messages: f.nb_messages || 0,
-    last_action: f.last_action || null,
-    all_actions: f.all_actions || null,
-    context_window: f.context_window || null,  // ← FULL ici
-    last_message_time: lastMsg.iso,
-    last_message_time_raw: lastMsg.raw,
-    last_modified_time: modified.iso,
-    last_modified_time_raw: modified.raw,
-    conversation_started_at: conversationStarted.iso,
-    pending_message: f.pending_message || null,
-    
-    // 3 statuts (cf. en-tête)
-    status: f.status || null,                       // contrôle Sabrina
-    sales_stage: f.sales_stage || null,
-    conversion_status: f.conversion_status || null, // funnel vente (pollué)
-    opp_status: f.opp_status || null,
-    last_proposed: f.last_proposed || null,
-    refusal_count: f.refusal_count || 0,
-    add_cart_attempts: f.add_cart_attempts || 0,
-    plus_tard_mode: f.plus_tard_mode || null,
-    current_category_focus: f.current_category_focus || null,
-    date_derniere_analyse: dateAnalyse.iso,
-    
-    // Panier / commande complet
-    cart_value: typeof f.cart_value === 'number' ? f.cart_value : (parseFloat(f.cart_value) || null),
-    cart_created_at: cartCreated.iso,
-    checkout_sent_at: checkoutSent.iso,
-    checkout_completed_at: checkoutCompleted.iso,
-    cancelled_at: cancelledAt.iso,
-    fulfilled_at: fulfilledAt.iso,
-    draft_order_id: f.draft_order_id || null,
-    invoice_url: f.invoice_url || null,
-    
-    // Préférences confirmées complètes
-    confirmed_category: f.confirmed_category || null,
-    confirmed_product_name: f.confirmed_product_name || null,
-    confirmed_product_id: f.confirmed_product_id || null,
-    confirmed_budget: f.confirmed_budget || null,
-    confirmed_size: f.confirmed_size || null,
-    confirmed_firmness: f.confirmed_firmness || null,
-    confirmed_city: f.confirmed_city || null,
-    confirmed_payment_method: f.confirmed_payment_method || null,
-    
-    // Workflow dashboard
-    traite_status: f.traite_status || null,         // workflow dashboard
-    traite_by: f.traite_by || null,
-    traite_at: traiteAt.iso,
-    traite_action: f.traite_action || null,
-    next_followup_at: nextFollowupAt.iso,
-    traite_note: f.traite_note || null
+    psid: fields.psid || '',
+    platform: fields.platform || 'messenger',
+    fbFirstName: fields.fb_first_name || '',
+    fbLastName: fields.fb_last_name || '',
+    customerName: fields.customer_name || '',
+    customerPhone: fields.customer_phone || '',
+    customerCity: fields.customer_city || '',
+    customerProvince: fields.customer_province || '',
+    customerZip: fields.customer_zip || '',
+    nbMessages: fields.nb_messages || 0,
+    lastAction: fields.last_action || '',
+    allActions: fields.all_actions || '',
+    contextPreview: (fields.context_window || '').slice(0, 500),
+    lastMessageTime: normalizeDate(fields.last_message_time),
+    lastModifiedTime: normalizeDate(fields['Last Modified Time']),
+    conversationStartedAt: normalizeDate(fields.conversation_started_at),
+    status: fields.status || 'active',
+    conversionStatus: fields.conversion_status || '',
+    salesStage: fields.sales_stage || '',
+    oppStatus: fields.opp_status || '',
+    cartValue: fields.cart_value || 0,
+    cartCreatedAt: normalizeDate(fields.cart_created_at),
+    checkoutSentAt: normalizeDate(fields.checkout_sent_at),
+    checkoutCompletedAt: normalizeDate(fields.checkout_completed_at),
+    draftOrderId: fields.draft_order_id || '',
+    invoiceUrl: fields.invoice_url || '',
+    confirmedCategory: fields.confirmed_category || '',
+    confirmedBudget: fields.confirmed_budget || '',
+    confirmedSize: fields.confirmed_size || '',
+    confirmedFirmness: fields.confirmed_firmness || '',
+    confirmedProductName: fields.confirmed_product_name || '',
+    confirmedProductId: fields.confirmed_product_id || '',
+    confirmedPaymentMethod: fields.confirmed_payment_method || '',
+    traiteStatus: fields.traite_status || 'open',
+    traiteBy: fields.traite_by || '',
+    traiteAt: normalizeDate(fields.traite_at),
+    traiteAction: fields.traite_action || '',
+    nextFollowupAt: normalizeDate(fields.next_followup_at),
+    traiteNote: fields.traite_note || '',
+    // ⭐ Lot 5.1 — Calculés côté API
+    nbMessagesClient: nbClient,
+    nbSubstantialMessages: nbSubstantial
   };
+}
+
+export default async function handler(req, res) {
+  if (req.method !== 'GET') return fail(res, 405, 'GET only');
+
+  const session = requireAuth(req, res);
+  if (!session) return;
+
+  return safe('api/data/convos', res, async () => {
+    const limit = Math.min(parseInt(req.query.limit) || 100, 200);
+    const offset = req.query.offset || undefined;
+
+    const { records, nextOffset } = await listRecords(TABLE, {
+      pageSize: limit,
+      offset,
+      sort: [{ field: 'Last Modified Time', direction: 'desc' }]
+    });
+
+    const data = records.map(mapConvo);
+
+    return ok(res, data, { nextOffset });
+  });
 }
