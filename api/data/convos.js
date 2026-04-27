@@ -167,15 +167,24 @@ export default async function handler(req, res) {
   const session = requireAuth(req, res);
   if (!session) return;
 
-  return safe('api/data/convos', res, async () => {
+return safe('api/data/convos', res, async () => {
     const limit = Math.min(parseInt(req.query.limit) || 100, 200);
     const offset = req.query.offset || undefined;
 
-    const { records, nextOffset } = await listRecords(TABLE, {
+    const result = await listRecords(TABLE, {
       pageSize: limit,
       offset,
       sort: [{ field: 'Last Modified Time', direction: 'desc' }]
     });
+
+    // Compatibilité : listRecords peut retourner soit un array, soit { records, nextOffset }
+    const records = Array.isArray(result) 
+      ? result 
+      : (result && Array.isArray(result.records) ? result.records : []);
+    
+    const nextOffset = Array.isArray(result) 
+      ? null 
+      : (result && result.nextOffset ? result.nextOffset : null);
 
     // Map + filter null (records qui ont planté à mapConvo)
     const data = records
