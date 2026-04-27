@@ -378,3 +378,43 @@ body.drawer-body-locked { overflow: hidden; }
   opacity: 0.5;
   cursor: not-allowed;
 }
+
+/* ═══ Lot 8.1 — Stop / Reactivate Sabrina dispatcher buttons ═══ */
+.btn-action.btn-dispatch--stop {
+  background: var(--red-bg);
+  color: var(--red);
+  border: 1px solid var(--red-border);
+  font-weight: 600;
+}
+.btn-action.btn-dispatch--stop:hover:not(:disabled) {
+  background: var(--red);
+  color: white;
+}
+.btn-action.btn-dispatch--reactivate {
+  background: var(--green-bg);
+  color: var(--green);
+  border: 1px solid var(--green-border);
+  font-weight: 600;
+}
+.btn-action.btn-dispatch--reactivate:hover:not(:disabled) {
+  background: var(--green);
+  color: white;
+}
+.btn-action.btn-dispatch--custom {
+  background: var(--bg-subtle);
+  color: var(--text-faint);
+  border: 1px dashed var(--border);
+  cursor: not-allowed;
+}
+.btn-action.btn-dispatch:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* Body text inside confirmation modals */
+.modal-text {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--text);
+}

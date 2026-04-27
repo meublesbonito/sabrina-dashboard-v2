@@ -1,14 +1,29 @@
 // ─────────────────────────────────────────────
-// GET /api/data/convo?id=recXXXX
-// Single conversation record + FULL context_window
-// (context_window is intentionally NOT exposed by /api/data/convos)
+// /api/data/convo
+//
+// GET   ?id=recXXXX                       → single record + FULL context_window
+//                                          (context_window is intentionally NOT
+//                                          exposed by /api/data/convos)
+//
+// PATCH { id, status }   (Lot 8.1 — co-located here to stay under the Vercel
+//                         Hobby 12-functions limit; previously a separate
+//                         /api/actions/dispatch-control endpoint)
+//   - Toggles the Sabrina dispatcher status on a single conversation.
+//   - Allowed input values: 'active' | 'human_only' (allowlist enforced).
+//   - Defense-in-depth: refuses 409 Conflict if the current status is a custom
+//     dispatcher value (e.g. 'handed_off', 'closed', "carted + ...").
 // ─────────────────────────────────────────────
 
 import { requireAuth } from '../_helpers/auth-check.js';
 import { ok, fail, safe } from '../_helpers/api-response.js';
 import { getRecord, normalizeDate } from '../_helpers/airtable.js';
+import { updateRecord } from '../_helpers/airtable-write.js';
 
 const TABLE = 'CONVERSATIONS';
+
+// Lot 8.1 dispatch-control allowlists
+const ALLOWED_TARGET_STATUSES = ['active', 'human_only'];
+const OVERWRITABLE_STATUSES = new Set(['active', 'human_only', '', null, undefined]);
 
 // ─────────────────────────────────────────────
 // Lot 5.1 — Detection of substantial messages (inlined here for self-containment)
@@ -126,16 +141,24 @@ function mapConvoFull(record) {
 }
 
 // ─────────────────────────────────────────────
-// Handler
+// Handler — dispatches by HTTP method
 // ─────────────────────────────────────────────
 
 export default async function handler(req, res) {
-  if (req.method !== 'GET') return fail(res, 405, 'GET only');
+  if (req.method === 'GET') return handleGet(req, res);
+  if (req.method === 'PATCH') return handlePatch(req, res);
+  return fail(res, 405, 'GET or PATCH only');
+}
 
+// ─────────────────────────────────────────────
+// GET — read single conversation with full context_window
+// ─────────────────────────────────────────────
+
+function handleGet(req, res) {
   const session = requireAuth(req, res);
   if (!session) return;
 
-  return safe('api/data/convo', res, async () => {
+  return safe('api/data/convo[GET]', res, async () => {
     const id = String(req.query.id || '').trim();
     if (!id) return fail(res, 400, 'id query param required');
     if (!id.startsWith('rec')) return fail(res, 400, 'Invalid id format');
@@ -154,5 +177,59 @@ export default async function handler(req, res) {
     if (!record) return fail(res, 404, 'Conversation not found');
 
     return ok(res, mapConvoFull(record));
+  });
+}
+
+// ─────────────────────────────────────────────
+// PATCH — Lot 8.1 dispatch-control (Stop / Reactivate Sabrina)
+// ─────────────────────────────────────────────
+
+function handlePatch(req, res) {
+  const session = requireAuth(req, res);
+  if (!session) return;
+
+  return safe('api/data/convo[PATCH]', res, async () => {
+    const body = req.body || {};
+    const id = typeof body.id === 'string' ? body.id.trim() : '';
+    const status = typeof body.status === 'string' ? body.status.trim() : '';
+
+    if (!id) return fail(res, 400, 'id required');
+    if (!id.startsWith('rec')) return fail(res, 400, 'Invalid id format');
+    if (!ALLOWED_TARGET_STATUSES.includes(status)) {
+      return fail(res, 400, `status must be one of: ${ALLOWED_TARGET_STATUSES.join(', ')}`);
+    }
+
+    // Read current status to ensure we don't overwrite a custom dispatcher value.
+    let record = null;
+    try {
+      record = await getRecord(TABLE, id);
+    } catch (err) {
+      if (err && typeof err.message === 'string' && /Airtable 4\d\d/.test(err.message)) {
+        return fail(res, 404, 'Conversation not found');
+      }
+      throw err;
+    }
+    if (!record) return fail(res, 404, 'Conversation not found');
+
+    const currentStatus = record.fields?.status;
+    if (!OVERWRITABLE_STATUSES.has(currentStatus)) {
+      res.status(409).json({
+        ok: false,
+        error: 'Status custom détecté — refusé pour ne pas écraser une automation.',
+        current_status: String(currentStatus)
+      });
+      return;
+    }
+
+    try {
+      await updateRecord(TABLE, id, { status });
+    } catch (err) {
+      if (err && typeof err.message === 'string' && /Airtable write 4\d\d/.test(err.message)) {
+        return fail(res, 404, 'Conversation not found');
+      }
+      throw err;
+    }
+
+    return ok(res, { id, status });
   });
 }
