@@ -93,10 +93,12 @@ export const api = {
     return request('POST', '/actions/signal-traite', { id, traite });
   },
 
-  // Lot 8.1 — Set the Sabrina dispatcher status on a single conversation
-  // (allowed values: 'active' | 'human_only')
+  // Lot 8.1 — Set the Sabrina dispatcher status on a single conversation.
+  // Allowed values: 'active' | 'human_only'.
+  // Co-located on /api/data/convo (PATCH method) to stay under the Vercel
+  // Hobby 12-functions limit; previously a dedicated /api/actions/dispatch-control.
   setDispatch(id, status) {
-    return request('POST', '/actions/dispatch-control', { id, status });
+    return request('PATCH', '/data/convo', { id, status });
   }
 };
 
