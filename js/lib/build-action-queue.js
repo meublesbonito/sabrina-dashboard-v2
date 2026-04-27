@@ -282,7 +282,12 @@ function makeAction(convo, { actionType, reason, phone, waitMinutes, signal }) {
     actionType,
     reason,
     lastMessage,
-    lastMessageAt: convo.last_message_time || null,
+    // Lot 7.1 (DT3) — expose ISO string (or null) instead of the raw
+    // { raw, iso } normalizeDate() shape, so downstream consumers can use
+    // `new Date(action.lastMessageAt)` without type-juggling.
+    lastMessageAt: (typeof convo.last_message_time === 'string'
+      ? convo.last_message_time
+      : convo.last_message_time?.iso) || null,
     waitMinutes,
     businessSuiteUrl,
     status: convo.traite_status || STATUSES.OPEN

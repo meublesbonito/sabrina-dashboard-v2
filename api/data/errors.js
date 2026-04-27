@@ -59,7 +59,11 @@ function toError(record) {
     errorMessage: f.error_message || null,
     timestamp: ts.iso,
     timestampRaw: ts.raw,
-    resolved: f.resolved || null,
+    // Lot 7.1 (DT4) — Airtable stores `resolved` as a single-select with the
+    // single value 'checked' (or empty/null). Normalize to a clean boolean
+    // for downstream consumers; the raw select value is intentionally not
+    // exposed since no consumer needs it.
+    resolved: f.resolved === 'checked',
     conversationRecordId: firstLinkedId(f.conversation_record_id)
   };
 }

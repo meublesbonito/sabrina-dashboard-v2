@@ -186,33 +186,25 @@ export default async function handler(req, res) {
 
 return safe('api/data/convos', res, async () => {
     const limit = Math.min(parseInt(req.query.limit) || 100, 200);
-    const offset = req.query.offset || undefined;
 
     // Lot 6 — optional multi-field search
     const search = String(req.query.search || '').trim().toLowerCase();
     const filterByFormula = search ? buildSearchFormula(search) : undefined;
 
-    const result = await listRecords(TABLE, {
-      pageSize: limit,
-      offset,
+    // Lot 7.1 (DT1) — listRecords expects `maxRecords`, not `pageSize`.
+    // Lot 7.1 (DT7) — listRecords always returns an array, no need for the
+    // legacy `{ records, nextOffset }` shape compatibility code.
+    const records = await listRecords(TABLE, {
+      maxRecords: limit,
       filterByFormula,
       sort: [{ field: 'Last Modified Time', direction: 'desc' }]
     });
 
-    // Compatibilité : listRecords peut retourner soit un array, soit { records, nextOffset }
-    const records = Array.isArray(result) 
-      ? result 
-      : (result && Array.isArray(result.records) ? result.records : []);
-    
-    const nextOffset = Array.isArray(result) 
-      ? null 
-      : (result && result.nextOffset ? result.nextOffset : null);
-
-    // Map + filter null (records qui ont planté à mapConvo)
+    // Map + filter null (records that crashed inside mapConvo)
     const data = records
       .map(mapConvo)
       .filter(c => c !== null);
 
-    return ok(res, data, { nextOffset });
+    return ok(res, data);
   });
 }
