@@ -52,11 +52,17 @@ export const api = {
     return request('GET', '/data/ping');
   },
   
+  // Accepts: { limit, search, sort, filter, offset }
+  //   sort   : 'recent' | 'oldest' | 'cart_desc' | 'messages_desc' | 'name_asc' (Lot 8.3)
+  //   filter : 'all' | 'active' | 'human_only' | 'with_cart'
+  //          | 'checkout_sent' | 'checkout_completed' | 'with_phone' (Lot 8.3)
+  //   offset : Airtable pagination token from a previous response.nextOffset (Lot 8.3)
   getConvos(opts = {}) {
     return request('GET', '/data/convos', null, opts);
   },
 
   // Lot 6 — multi-field search (name, phone, psid, city). Case-insensitive substring.
+  // Accepts the same Lot 8.3 options as getConvos (sort, filter, offset).
   searchConvos(query, opts = {}) {
     return request('GET', '/data/convos', null, { search: query, ...opts });
   },

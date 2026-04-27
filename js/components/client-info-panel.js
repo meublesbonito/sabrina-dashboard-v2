@@ -40,7 +40,10 @@ export function renderClientInfoPanel(convo, signals = []) {
   wrap.appendChild(renderHeader(convo));
   wrap.appendChild(renderBusinessSection(convo));
   wrap.appendChild(renderCartSection(convo));
-  wrap.appendChild(renderWorkflowSection(convo));
+  // Lot 8.2 — replaces the old Workflow Sabrina kv-grid with a hierarchical
+  // "Actions faites" rectangle (last team action prominent, footnote about
+  // missing detailed history).
+  wrap.appendChild(renderActionsHistorySection(convo));
   wrap.appendChild(renderSignalsSection(signals));
   wrap.appendChild(renderConversationSection(convo));
 
@@ -487,21 +490,148 @@ function renderCartSection(c) {
   return sec;
 }
 
-function renderWorkflowSection(c) {
-  const sec = sectionWithTitle('Workflow Sabrina');
-  const grid = document.createElement('div');
-  grid.className = 'panel-grid';
-  grid.appendChild(kv('Statut traité', c.traite_status || 'open'));
-  grid.appendChild(kv('Traité par', c.traite_by));
-  grid.appendChild(kv('Traité le', formatDate(c.traite_at)));
-  grid.appendChild(kv('Action', c.traite_action));
-  grid.appendChild(kv('Prochain suivi', formatDate(c.next_followup_at)));
-  grid.appendChild(kv('Status Sabrina', c.status));
-  if (c.traite_note) {
-    grid.appendChild(kv('Note', c.traite_note, /*wide*/ true));
+// ─────────────────────────────────────────────
+// Lot 8.2 — Actions faites rectangle
+// Replaces the old kv-grid Workflow Sabrina with a hierarchical card-style
+// layout: last team action prominent, fallback empty state, plus the explicit
+// footnote about missing detailed history.
+// ─────────────────────────────────────────────
+
+const TRAITE_STATUS_LABEL = {
+  open:             'Ouvert',
+  done:             'Marqué traité',
+  converted:        'Marqué converti',
+  called_no_answer: 'Appelé sans réponse',
+  lost:             'Marqué perdu'
+};
+
+function renderActionsHistorySection(c) {
+  const sec = document.createElement('section');
+  sec.className = 'panel-section panel-actions-history';
+
+  const h = document.createElement('h3');
+  h.className = 'panel-section-title';
+  h.textContent = 'Actions faites';
+  sec.appendChild(h);
+
+  // Empty state: no team action recorded yet
+  const noTeamAction = (!c.traite_status || c.traite_status === 'open') && !c.traite_by;
+
+  if (noTeamAction) {
+    const empty = document.createElement('div');
+    empty.className = 'actions-history-empty';
+    empty.textContent = 'Aucune action équipe enregistrée.';
+    sec.appendChild(empty);
+  } else {
+    const card = document.createElement('div');
+    card.className = 'actions-history-card';
+
+    const head = document.createElement('div');
+    head.className = 'actions-history-head';
+    head.textContent = 'Dernière action équipe';
+    card.appendChild(head);
+
+    const typeLine = document.createElement('div');
+    typeLine.className = 'actions-history-type';
+    typeLine.textContent = TRAITE_STATUS_LABEL[c.traite_status] || c.traite_status || '—';
+    card.appendChild(typeLine);
+
+    const byLine = document.createElement('div');
+    byLine.className = 'actions-history-by';
+    const dateText = formatDateRelative(c.traite_at);
+    const dateAbsolute = formatDate(c.traite_at);
+    if (c.traite_by && dateText) {
+      byLine.textContent = `Par ${c.traite_by} · ${dateText}${dateAbsolute !== '—' ? ` (${dateAbsolute})` : ''}`;
+    } else if (c.traite_by) {
+      byLine.textContent = `Par ${c.traite_by}`;
+    } else if (dateText) {
+      byLine.textContent = dateText;
+    } else {
+      byLine.textContent = '';
+    }
+    if (byLine.textContent) card.appendChild(byLine);
+
+    if (c.traite_note) {
+      const note = document.createElement('div');
+      note.className = 'actions-history-note';
+      note.textContent = `« ${c.traite_note} »`;
+      card.appendChild(note);
+    } else if (c.traite_action && c.traite_action !== `Marqué traité par ${c.traite_by || ''}`) {
+      // Show traite_action only if it carries info beyond the canonical "Marqué traité par X"
+      const action = document.createElement('div');
+      action.className = 'actions-history-note';
+      action.textContent = c.traite_action;
+      card.appendChild(action);
+    }
+
+    sec.appendChild(card);
   }
-  sec.appendChild(grid);
+
+  // Followup row + Status Sabrina row (always visible, even in empty state)
+  const meta = document.createElement('div');
+  meta.className = 'actions-history-meta';
+
+  const followupValue = formatDate(c.next_followup_at);
+  meta.appendChild(makeMetaLine('Prochain rappel', followupValue));
+  meta.appendChild(makeMetaLine('Status Sabrina', formatSabrinaStatus(c.status)));
+
+  sec.appendChild(meta);
+
+  // Footnote — explicit about missing history
+  const note = document.createElement('div');
+  note.className = 'actions-history-footnote';
+  note.textContent = 'Historique détaillé non disponible — seulement dernière action équipe.';
+  sec.appendChild(note);
+
   return sec;
+}
+
+function makeMetaLine(label, value) {
+  const row = document.createElement('div');
+  row.className = 'actions-history-meta-row';
+  const k = document.createElement('span');
+  k.className = 'actions-history-meta-k';
+  k.textContent = label;
+  const v = document.createElement('span');
+  v.className = 'actions-history-meta-v';
+  if (value === null || value === undefined || value === '') {
+    v.textContent = '—';
+    v.classList.add('actions-history-meta-v--empty');
+  } else {
+    v.textContent = String(value);
+  }
+  row.appendChild(k);
+  row.appendChild(v);
+  return row;
+}
+
+function formatSabrinaStatus(status) {
+  const known = {
+    'active':     'Sabrina active',
+    'human_only': 'Sabrina arrêtée (human_only)',
+    'handed_off': 'Sabrina transférée (handed_off)',
+    'closed':     'Conversation fermée'
+  };
+  if (!status) return 'Sabrina active';
+  return known[status] || `Custom : ${status}`;
+}
+
+function formatDateRelative(d) {
+  if (!d) return null;
+  const iso = typeof d === 'string' ? d : d.iso;
+  if (!iso) return null;
+  let ts;
+  try { ts = new Date(iso).getTime(); } catch { return null; }
+  if (isNaN(ts)) return null;
+  const diffMs = Date.now() - ts;
+  if (diffMs < 0) return "à l'instant";
+  const minutes = Math.floor(diffMs / 60_000);
+  if (minutes < 1) return "à l'instant";
+  if (minutes < 60) return `il y a ${minutes} min`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `il y a ${hours}h`;
+  const days = Math.floor(hours / 24);
+  return `il y a ${days}j`;
 }
 
 function renderSignalsSection(signals) {

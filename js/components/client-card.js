@@ -33,7 +33,7 @@ export function renderClientCard(convo, onClick) {
   card.dataset.id = convo.id || '';
   card.dataset.psid = convo.psid || '';
 
-  // ─── Line 1: name · phone ───
+  // ─── Line 1: name · phone · Sabrina status mini-badge ───
   const line1 = document.createElement('div');
   line1.className = 'client-card-line1';
 
@@ -48,6 +48,11 @@ export function renderClientCard(convo, onClick) {
     phone.textContent = formatPhone(convo.customer_phone);
     line1.appendChild(phone);
   }
+
+  // Lot 8.3 — Sabrina dispatcher status mini-badge (active / human_only /
+  // handed_off / custom). Always rendered so the team sees the dispatcher
+  // state at a glance in the list.
+  line1.appendChild(makeSabrinaStatusBadge(convo.status));
 
   card.appendChild(line1);
 
@@ -131,6 +136,43 @@ function clientNameOf(c) {
   return c.customer_name
     || [c.fb_first_name, c.fb_last_name].filter(Boolean).join(' ')
     || `Client #${String(c.psid || '').slice(-4) || '????'}`;
+}
+
+/**
+ * Lot 8.3 — Sabrina dispatcher status mini-badge.
+ *   - 'active' (or empty) → green dot "Active"
+ *   - 'human_only'        → orange "🔇 Stop Sabrina"
+ *   - 'handed_off'        → blue "Transféré"
+ *   - 'closed'            → grey "Fermé"
+ *   - anything else       → grey "Auto" with tooltip showing the raw value
+ */
+function makeSabrinaStatusBadge(status) {
+  const badge = document.createElement('span');
+  badge.className = 'client-card-sabrina';
+
+  if (!status || status === 'active') {
+    badge.classList.add('client-card-sabrina--active');
+    badge.textContent = 'Active';
+    badge.title = 'Sabrina répond automatiquement';
+  } else if (status === 'human_only') {
+    badge.classList.add('client-card-sabrina--human');
+    badge.textContent = '🔇 Stop';
+    badge.title = 'Sabrina arrêtée (human_only)';
+  } else if (status === 'handed_off') {
+    badge.classList.add('client-card-sabrina--handed');
+    badge.textContent = 'Transféré';
+    badge.title = 'Sabrina transférée (handed_off)';
+  } else if (status === 'closed') {
+    badge.classList.add('client-card-sabrina--closed');
+    badge.textContent = 'Fermé';
+    badge.title = 'Conversation fermée';
+  } else {
+    badge.classList.add('client-card-sabrina--custom');
+    badge.textContent = 'Auto';
+    badge.title = `Status custom (${status}) — géré par automation`;
+  }
+
+  return badge;
 }
 
 function makeChip(extraClass, text) {
