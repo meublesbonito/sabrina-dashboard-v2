@@ -316,8 +316,8 @@ function isAdTemplateNoise(action, convo) {
   if (action.phone) return false;
   if (convo.cart_value && convo.cart_value > 0) return false;
   if (convo.draft_order_id) return false;
-  if (convo.checkout_sent_at) return false;
-  if (convo.checkout_completed_at) return false;
+  if (convo.checkout_sent_at?.iso) return false;
+  if (convo.checkout_completed_at?.iso) return false;
   if (convo.confirmed_product_name) return false;
   if (convo.confirmed_payment_method) return false;
   if (convo.confirmed_budget) return false;
