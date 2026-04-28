@@ -141,8 +141,8 @@ a:hover {
 }
 
 .field-input:focus {
-  border-color: var(--border-focus);
-  box-shadow: 0 0 0 3px var(--gray-bg);
+  border-color: var(--blue);
+  box-shadow: var(--focus-ring);
 }
 
 .user-grid {
@@ -170,6 +170,12 @@ a:hover {
   border-color: var(--border-hover);
 }
 
+.user-btn:focus-visible {
+  outline: none;
+  border-color: var(--blue);
+  box-shadow: var(--focus-ring);
+}
+
 .user-btn.active {
   background: var(--text);
   color: var(--text-inverse);
@@ -189,10 +195,17 @@ a:hover {
   cursor: pointer;
   transition: var(--transition);
   margin-top: var(--space-2);
+  box-shadow: var(--shadow-sm);
 }
 
 .btn-primary:hover {
-  opacity: 0.9;
+  opacity: 0.92;
+  box-shadow: var(--shadow-md);
+}
+
+.btn-primary:focus-visible {
+  outline: none;
+  box-shadow: var(--shadow-sm), var(--focus-ring);
 }
 
 .btn-primary:active {
@@ -202,6 +215,7 @@ a:hover {
 .btn-primary:disabled {
   opacity: 0.5;
   cursor: not-allowed;
+  box-shadow: none;
 }
 
 .login-error {
@@ -379,6 +393,12 @@ a:hover {
   border-color: var(--border-hover);
 }
 
+.btn-icon:focus-visible {
+  outline: none;
+  border-color: var(--blue);
+  box-shadow: var(--focus-ring);
+}
+
 .btn-ghost {
   padding: 6px 12px;
   background: transparent;
@@ -395,6 +415,11 @@ a:hover {
 .btn-ghost:hover {
   background: var(--bg-hover);
   color: var(--text);
+}
+
+.btn-ghost:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
 }
 
 /* Nav */
