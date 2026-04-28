@@ -26,16 +26,17 @@
 }
 
 .clients-sort-label {
-  font-size: 12px;
-  font-weight: 500;
+  font-size: var(--text-sm);
+  font-weight: var(--font-weight-medium);
   color: var(--text-muted);
+  letter-spacing: var(--tracking-base);
 }
 
 .clients-sort {
-  min-width: 180px;
+  min-width: 200px;
   cursor: pointer;
   font-family: 'Inter', sans-serif;
-  font-size: 13px;
+  font-size: var(--text-base);
 }
 
 /* ═══ Filter chips ═══ */
@@ -46,33 +47,43 @@
 }
 
 .clients-filter-chip {
-  padding: 5px 10px;
+  padding: 6px 12px;
   background: var(--bg-card);
   color: var(--text-muted);
   border: 1px solid var(--border);
-  border-radius: 999px;
-  font-size: 12px;
-  font-weight: 500;
+  border-radius: var(--radius-full);
+  font-size: var(--text-sm);
+  font-weight: var(--font-weight-medium);
   cursor: pointer;
-  transition: var(--transition);
+  transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease, box-shadow 0.2s var(--ease-out);
   font-family: 'Inter', sans-serif;
   white-space: nowrap;
+  letter-spacing: var(--tracking-base);
 }
 
 .clients-filter-chip:hover {
   background: var(--bg-hover);
   color: var(--text);
   border-color: var(--border-hover);
+  box-shadow: var(--shadow-xs);
+}
+
+.clients-filter-chip:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+  border-color: var(--accent);
 }
 
 .clients-filter-chip--active {
-  background: var(--text);
-  color: var(--text-inverse);
-  border-color: var(--text);
+  background: var(--accent-soft);
+  color: var(--accent);
+  border-color: var(--accent-border);
+  font-weight: var(--font-weight-semibold);
 }
 .clients-filter-chip--active:hover {
-  background: var(--text);
-  color: var(--text-inverse);
+  background: var(--accent-soft);
+  color: var(--accent);
+  border-color: var(--accent);
 }
 
 /* ═══ Status line ═══ */
@@ -102,13 +113,24 @@
   background: var(--bg-card);
   color: var(--text);
   border: 1px solid var(--border);
-  padding: var(--space-2) var(--space-5);
-  font-size: 13px;
-  font-weight: 600;
+  padding: var(--space-3) var(--space-6);
+  font-size: var(--text-base);
+  font-weight: var(--font-weight-semibold);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-xs);
+  letter-spacing: var(--tracking-base);
+  transition: background 0.15s ease, border-color 0.15s ease, box-shadow 0.2s var(--ease-out), transform 0.2s var(--ease-out);
 }
 .btn-load-more:hover:not(:disabled) {
   background: var(--bg-hover);
   border-color: var(--border-hover);
+  box-shadow: var(--shadow-sm);
+  transform: translateY(-1px);
+}
+.btn-load-more:focus-visible {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: var(--focus-ring);
 }
 .btn-load-more:disabled {
   opacity: 0.5;
@@ -125,11 +147,11 @@
 .client-card-sabrina {
   margin-left: var(--space-2);
   font-size: 10px;
-  font-weight: 600;
-  padding: 2px 7px;
-  border-radius: 999px;
+  font-weight: var(--font-weight-semibold);
+  padding: 2px 8px;
+  border-radius: var(--radius-full);
   text-transform: uppercase;
-  letter-spacing: 0.04em;
+  letter-spacing: var(--tracking-wide);
   white-space: nowrap;
   border: 1px solid var(--border);
   background: var(--bg-subtle);
@@ -175,38 +197,41 @@
 
 .actions-history-card {
   background: var(--bg-subtle);
-  border-left: 3px solid var(--blue);
+  border-left: 3px solid var(--accent);
   padding: var(--space-3) var(--space-4);
   border-radius: var(--radius-sm);
   margin-bottom: var(--space-3);
   display: flex;
   flex-direction: column;
   gap: 2px;
+  box-shadow: var(--shadow-xs);
 }
 
 .actions-history-head {
-  font-size: 11px;
+  font-size: var(--text-xs);
   text-transform: uppercase;
-  letter-spacing: 0.04em;
+  letter-spacing: var(--tracking-wide);
   color: var(--text-faint);
-  font-weight: 600;
+  font-weight: var(--font-weight-semibold);
 }
 .actions-history-type {
-  font-size: 14px;
-  font-weight: 600;
+  font-size: var(--text-md);
+  font-weight: var(--font-weight-semibold);
   color: var(--text);
+  letter-spacing: var(--tracking-base);
 }
 .actions-history-by {
-  font-size: 12px;
+  font-size: var(--text-sm);
   color: var(--text-muted);
 }
 .actions-history-note {
-  font-size: 13px;
+  font-size: var(--text-base);
   color: var(--text);
   font-style: italic;
   margin-top: var(--space-1);
   white-space: pre-wrap;
   word-break: break-word;
+  line-height: var(--leading-normal);
 }
 
 .actions-history-meta {
