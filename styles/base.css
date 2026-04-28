@@ -247,6 +247,7 @@ a:hover {
   position: sticky;
   top: 0;
   z-index: 100;
+  box-shadow: var(--shadow-xs);
 }
 
 .header-left {
@@ -268,16 +269,18 @@ a:hover {
 }
 
 .brand-logo {
-  width: 28px;
-  height: 28px;
-  border-radius: var(--radius-sm);
+  width: 30px;
+  height: 30px;
+  border-radius: var(--radius-md);
   background: var(--text);
   color: var(--text-inverse);
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 13px;
+  font-size: 14px;
   font-weight: 700;
+  letter-spacing: -0.02em;
+  box-shadow: var(--shadow-xs);
 }
 
 .brand-text {
@@ -369,7 +372,9 @@ a:hover {
   font-family: 'JetBrains Mono', monospace;
   padding: 4px 10px;
   background: var(--bg-subtle);
-  border-radius: 100px;
+  border-radius: var(--radius-full);
+  border: 1px solid var(--border);
+  letter-spacing: 0.02em;
 }
 
 .btn-icon {
@@ -429,31 +434,40 @@ a:hover {
   padding: 0 var(--space-6);
   display: flex;
   gap: var(--space-1);
+  box-shadow: var(--shadow-xs);
 }
 
 .nav-tab {
-  padding: var(--space-3) var(--space-4);
+  padding: var(--space-3) var(--space-5);
   background: transparent;
   border: none;
   border-bottom: 2px solid transparent;
   color: var(--text-muted);
   font-family: 'Inter', sans-serif;
-  font-size: 13px;
-  font-weight: 500;
+  font-size: var(--text-base);
+  font-weight: var(--font-weight-medium);
   cursor: pointer;
-  transition: var(--transition);
+  transition: color 0.15s ease, border-color 0.15s ease;
   margin-bottom: -1px;
-  letter-spacing: -0.01em;
+  letter-spacing: var(--tracking-base);
+  border-radius: var(--radius-xs) var(--radius-xs) 0 0;
 }
 
 .nav-tab:hover {
   color: var(--text);
 }
 
+.nav-tab:focus-visible {
+  outline: none;
+  color: var(--text);
+  box-shadow: var(--focus-ring);
+  border-radius: var(--radius-sm);
+}
+
 .nav-tab.active {
   color: var(--text);
   border-bottom-color: var(--text);
-  font-weight: 600;
+  font-weight: var(--font-weight-semibold);
 }
 
 /* Content */
@@ -484,16 +498,18 @@ a:hover {
 }
 
 .page-title {
-  font-size: 28px;
-  font-weight: 700;
-  letter-spacing: -0.03em;
-  line-height: 1.1;
-  margin-bottom: var(--space-1);
+  font-size: var(--text-3xl);
+  font-weight: var(--font-weight-bold);
+  letter-spacing: var(--tracking-tight);
+  line-height: var(--leading-tight);
+  margin-bottom: var(--space-2);
+  color: var(--text);
 }
 
 .page-subtitle {
-  font-size: 13px;
+  font-size: var(--text-md);
   color: var(--text-muted);
+  letter-spacing: var(--tracking-base);
 }
 
 /* Empty state */
