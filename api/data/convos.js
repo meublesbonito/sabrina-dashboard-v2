@@ -5,9 +5,47 @@
 
 import { requireAuth } from '../_helpers/auth-check.js';
 import { ok, fail, safe } from '../_helpers/api-response.js';
-import { listRecords, normalizeDate } from '../_helpers/airtable.js';
+import { listRecords, normalizeDate, firstLinkedId } from '../_helpers/airtable.js';
 
 const TABLE = 'CONVERSATIONS';
+const RELANCES_TABLE = 'RELANCES';
+
+// ─────────────────────────────────────────────
+// RELANCES — ?source=relances co-localisation
+// Lecture de la table RELANCES (Sabrina). Stays under the
+// Vercel Hobby 12-functions limit by branching here instead of
+// creating a dedicated /api/data/relances endpoint.
+// ─────────────────────────────────────────────
+
+const RELANCES_OPEN_FILTER = "OR({statut}='à_appeler', {statut}='à_relancer_messenger')";
+const RELANCES_MAX_RECORDS = 50;
+
+function mapRelance(record) {
+  try {
+    const f = record.fields || {};
+    return {
+      id: record.id,
+      psid: f.psid || '',
+      type_relance: f.type_relance || '',
+      canal_relance: f.canal_relance || '',
+      raison_ia: f.raison_ia || '',
+      // Strip accents on response keys (snake_case ASCII per project convention)
+      message_suggere: f['message_suggéré'] || '',
+      produit_principal: f.produit_principal || '',
+      valeur_estimee: typeof f['valeur_estimée'] === 'number' ? f['valeur_estimée'] : 0,
+      priorite: f['priorité'] || '',
+      statut: f.statut || '',
+      date_creation: normalizeDate(f['date_création']),
+      derniere_activite_client: normalizeDate(f['dernière_activité_client']),
+      signal_source_id: typeof f.signal_source_id === 'string'
+        ? f.signal_source_id
+        : firstLinkedId(f.signal_source_id) || ''
+    };
+  } catch (err) {
+    console.error('[mapRelance] error on record', record && record.id, ':', err && err.message);
+    return null;
+  }
+}
 
 // ─────────────────────────────────────────────
 // Lot 5.1 — Détection messages substantiels
@@ -216,6 +254,18 @@ export default async function handler(req, res) {
 
   const session = requireAuth(req, res);
   if (!session) return;
+
+  // ─── RELANCES branch (co-located here to stay at 12 endpoints) ───
+  if (req.query.source === 'relances') {
+    return safe('api/data/convos[relances]', res, async () => {
+      const records = await listRecords(RELANCES_TABLE, {
+        filterByFormula: RELANCES_OPEN_FILTER,
+        maxRecords: RELANCES_MAX_RECORDS
+      });
+      const data = records.map(mapRelance).filter(r => r !== null);
+      return ok(res, data);
+    });
+  }
 
 return safe('api/data/convos', res, async () => {
     const limit = Math.min(parseInt(req.query.limit) || 100, 200);

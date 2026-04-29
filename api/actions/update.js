@@ -8,6 +8,7 @@ import { ok, fail, safe } from '../_helpers/api-response.js';
 import { updateRecord } from '../_helpers/airtable-write.js';
 
 const TABLE = 'CONVERSATIONS';
+const RELANCES_TABLE = 'RELANCES';
 
 const ACTION_TO_STATUS = {
   'converted': 'converted',
@@ -18,6 +19,22 @@ const ACTION_TO_STATUS = {
 
 const VALID_ACTIONS = Object.keys(ACTION_TO_STATUS);
 
+// ─────────────────────────────────────────────
+// RELANCES — target="relance" co-localisation
+// Update RELANCES.statut only. Co-located here to stay under
+// the Vercel Hobby 12-functions limit. Strict allowlist —
+// no other RELANCES field is writable via this endpoint.
+// ─────────────────────────────────────────────
+
+const RELANCE_ACTION_TO_STATUT = {
+  'mark_called':    'appelé',
+  'mark_converted': 'converti',
+  'mark_lost':      'perdu',
+  'mark_ignored':   'ignoré'
+};
+
+const VALID_RELANCE_ACTIONS = Object.keys(RELANCE_ACTION_TO_STATUT);
+
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
     return fail(res, 405, 'POST only');
@@ -26,14 +43,32 @@ export default async function handler(req, res) {
   const session = requireAuth(req, res);
   if (!session) return;
   
+  // ─── RELANCES branch (co-located, strict allowlist, statut-only write) ───
+  const target = req.body && req.body.target;
+  if (target === 'relance') {
+    return safe('api/actions/update[relance]', res, async () => {
+      const { id, action } = req.body || {};
+      if (!id || typeof id !== 'string' || !id.startsWith('rec')) {
+        return fail(res, 400, 'id invalide (doit commencer par "rec")');
+      }
+      if (!action || !VALID_RELANCE_ACTIONS.includes(action)) {
+        return fail(res, 400, `action doit être : ${VALID_RELANCE_ACTIONS.join(', ')}`);
+      }
+      const newStatut = RELANCE_ACTION_TO_STATUT[action];
+      // Strict: only the statut field is updated. Nothing else.
+      await updateRecord(RELANCES_TABLE, id, { statut: newStatut });
+      return ok(res, { id, statut: newStatut });
+    });
+  }
+
   return safe('api/actions/update', res, async () => {
     const { id, action, note, followupAt } = req.body || {};
-    
+
     // ─── Validations communes ───
     if (!id || typeof id !== 'string' || !id.startsWith('rec')) {
       return fail(res, 400, 'id invalide (doit commencer par "rec")');
     }
-    
+
     if (!action || !VALID_ACTIONS.includes(action)) {
       return fail(res, 400, `action doit être : ${VALID_ACTIONS.join(', ')}`);
     }

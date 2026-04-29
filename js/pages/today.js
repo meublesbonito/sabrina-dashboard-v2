@@ -19,6 +19,9 @@ import {
   isPending
 } from '../lib/queue-manager.js';
 import { openDrawerForConvo } from './clients.js';
+import { api } from '../lib/api.js';
+import { renderRelanceCard } from '../components/relance-card.js';
+import { isDemoMode } from './demo.js';
 
 const LOST_REASONS = [
   { value: 'price_too_high', label: 'Prix trop cher' },
@@ -30,24 +33,388 @@ const LOST_REASONS = [
 
 let initialized = false;
 
+// ─────────────────────────────────────────────
+// RELANCES — section "Actions à effectuer maintenant"
+// State module-scoped, indépendant de la queue Today.
+// Rebuilt à chaque renderTodayPage depuis ce cache (pas de re-fetch).
+// Auto-refresh toutes les 2 minutes, sauf si une action PATCH est en cours.
+// ─────────────────────────────────────────────
+
+const RELANCES_AUTO_REFRESH_MS = 120000; // 2 min
+const RELANCES_DEFAULT_VISIBLE = 10;
+
+let relancesCache = [];
+let relancesLoading = false;
+let relancesError = null;
+let relancesShowAll = false;
+let relancesLoadedOnce = false;
+const relancesPending = new Map(); // recId → actionKey ('copy', 'mark_called', etc.)
+let relancesAutoRefreshTimer = null;
+
+// Last queue snapshot — used by the global "Résumé du jour" so it can rerender
+// when only relances change (no queue update). Updated in renderTodayPage().
+let lastQueueSnapshot = [];
+
+const PRIORITY_RANK = { haute: 0, moyenne: 1, basse: 2 };
+
+function sortRelances(arr) {
+  return [...arr].sort((a, b) => {
+    const pA = PRIORITY_RANK[(a.priorite || '').toLowerCase()] ?? 99;
+    const pB = PRIORITY_RANK[(b.priorite || '').toLowerCase()] ?? 99;
+    if (pA !== pB) return pA - pB;
+    const cA = (a.canal_relance || '').toLowerCase() === 'appel' ? 0 : 1;
+    const cB = (b.canal_relance || '').toLowerCase() === 'appel' ? 0 : 1;
+    if (cA !== cB) return cA - cB;
+    const vA = a.valeur_estimee || 0;
+    const vB = b.valeur_estimee || 0;
+    if (vA !== vB) return vB - vA;
+    const dA = a.derniere_activite_client?.iso ? new Date(a.derniere_activite_client.iso).getTime() : 0;
+    const dB = b.derniere_activite_client?.iso ? new Date(b.derniere_activite_client.iso).getTime() : 0;
+    return dB - dA;
+  });
+}
+
+async function loadRelances() {
+  if (isDemoMode()) return;
+  if (relancesPending.size > 0) return; // gate: ne pas refetch pendant un PATCH
+  relancesLoading = true;
+  relancesError = null;
+  rerenderRelancesSection();
+  const res = await api.getRelances();
+  relancesLoading = false;
+  if (res && res.ok) {
+    relancesCache = sortRelances(Array.isArray(res.data) ? res.data : []);
+    relancesError = null;
+    relancesLoadedOnce = true;
+  } else {
+    relancesError = (res && res.error) || 'Erreur de chargement des relances';
+  }
+  rerenderRelancesSection();
+}
+
+function startRelancesAutoRefresh() {
+  if (relancesAutoRefreshTimer) return;
+  relancesAutoRefreshTimer = setInterval(() => {
+    if (relancesPending.size > 0) return; // skip si action en cours
+    if (isDemoMode()) return;
+    loadRelances();
+  }, RELANCES_AUTO_REFRESH_MS);
+}
+
+function rerenderRelancesSection() {
+  const slot = document.getElementById('today-relances-slot');
+  if (slot) slot.replaceChildren(buildRelancesSection());
+  // Le résumé global dépend aussi de relancesCache → on le rerender ici.
+  rerenderTodaySummary();
+}
+
+function rerenderTodaySummary() {
+  const slot = document.getElementById('today-summary-slot');
+  if (!slot) return;
+  slot.replaceChildren(buildTodaySummary(lastQueueSnapshot));
+}
+
+// ─────────────────────────────────────────────
+// Résumé du jour — bloc compact en haut de Today
+// Source de vérité : relancesCache + lastQueueSnapshot (queue actuelle).
+// Rerender automatique :
+//  - via renderTodayPage() à chaque cycle queue
+//  - via rerenderTodaySummary() après mutation locale relances
+// ─────────────────────────────────────────────
+
+function buildTodaySummary(queue) {
+  const safeQueue = Array.isArray(queue) ? queue : [];
+
+  const relancesCount = relancesCache.length;
+  const suivisCount = safeQueue.length;
+  const totalActions = relancesCount + suivisCount;
+
+  const valeurRelances = relancesCache.reduce((s, r) => s + (r.valeur_estimee || 0), 0);
+  const valeurSuivis   = safeQueue.reduce((s, a) => s + (a.value || 0), 0);
+  const valeurTotale   = valeurRelances + valeurSuivis;
+
+  const section = document.createElement('section');
+  section.className = 'today-summary';
+
+  // Eyebrow label
+  const label = document.createElement('div');
+  label.className = 'today-summary-label';
+  label.textContent = 'Résumé du jour';
+  section.appendChild(label);
+
+  // Two-column grid : actions / valeur
+  const grid = document.createElement('div');
+  grid.className = 'today-summary-grid';
+
+  // Stat 1 : Total actions
+  const statActions = document.createElement('div');
+  statActions.className = 'today-summary-stat';
+  const numActions = document.createElement('div');
+  numActions.className = 'today-summary-stat-num';
+  numActions.textContent = String(totalActions);
+  const labActions = document.createElement('div');
+  labActions.className = 'today-summary-stat-lab';
+  labActions.textContent = totalActions > 1 ? 'actions à traiter' : 'action à traiter';
+  statActions.appendChild(numActions);
+  statActions.appendChild(labActions);
+  grid.appendChild(statActions);
+
+  // Stat 2 : Valeur totale
+  const statValue = document.createElement('div');
+  statValue.className = 'today-summary-stat today-summary-stat--money';
+  const numValue = document.createElement('div');
+  numValue.className = 'today-summary-stat-num';
+  numValue.textContent = formatMoney(valeurTotale);
+  const labValue = document.createElement('div');
+  labValue.className = 'today-summary-stat-lab';
+  labValue.textContent = 'potentiel total';
+  statValue.appendChild(numValue);
+  statValue.appendChild(labValue);
+  grid.appendChild(statValue);
+
+  section.appendChild(grid);
+
+  // Breakdown : "X relances Sabrina · Y suivis existants"
+  const breakdown = document.createElement('div');
+  breakdown.className = 'today-summary-breakdown';
+
+  const partRelances = document.createElement('span');
+  partRelances.className = 'today-summary-breakdown-part';
+  const partRelancesNum = document.createElement('strong');
+  partRelancesNum.textContent = String(relancesCount);
+  partRelances.appendChild(partRelancesNum);
+  partRelances.appendChild(document.createTextNode(' relances Sabrina'));
+
+  const sep = document.createElement('span');
+  sep.className = 'today-summary-breakdown-sep';
+  sep.textContent = ' · ';
+
+  const partSuivis = document.createElement('span');
+  partSuivis.className = 'today-summary-breakdown-part';
+  const partSuivisNum = document.createElement('strong');
+  partSuivisNum.textContent = String(suivisCount);
+  partSuivis.appendChild(partSuivisNum);
+  partSuivis.appendChild(document.createTextNode(suivisCount > 1 ? ' suivis existants' : ' suivi existant'));
+
+  breakdown.appendChild(partRelances);
+  breakdown.appendChild(sep);
+  breakdown.appendChild(partSuivis);
+
+  section.appendChild(breakdown);
+
+  return section;
+}
+
+function removeRelanceLocally(id) {
+  relancesCache = relancesCache.filter(r => r.id !== id);
+  relancesPending.delete(id);
+  rerenderRelancesSection();
+}
+
+function setPending(id, actionKey) {
+  relancesPending.set(id, actionKey);
+  rerenderRelancesSection();
+}
+function clearPending(id) {
+  relancesPending.delete(id);
+  rerenderRelancesSection();
+}
+
+// ─── Callbacks RELANCE ───
+
+async function handleRelanceCopy(relance) {
+  if (relancesPending.has(relance.id)) return;
+  setPending(relance.id, 'copy');
+  try {
+    await navigator.clipboard.writeText(relance.message_suggere || '');
+    toast.success('Message copié');
+  } catch {
+    toast.error('Impossible de copier');
+  }
+  clearPending(relance.id);
+}
+
+async function handleRelanceCopyAndCalled(relance) {
+  if (relancesPending.has(relance.id)) return;
+  setPending(relance.id, 'copy_and_called');
+  try {
+    await navigator.clipboard.writeText(relance.message_suggere || '');
+  } catch {
+    toast.error('Impossible de copier');
+    clearPending(relance.id);
+    return;
+  }
+  const res = await api.updateRelance(relance.id, 'mark_called');
+  if (res && res.ok) {
+    removeRelanceLocally(relance.id);
+    toast.success('Message copié · marqué traité');
+  } else {
+    clearPending(relance.id);
+    toast.error(`Échec : ${(res && res.error) || 'erreur inconnue'}`);
+  }
+}
+
+function makeRelanceWriter(action, successLabel) {
+  return async (relance) => {
+    if (relancesPending.has(relance.id)) return;
+    setPending(relance.id, action);
+    const res = await api.updateRelance(relance.id, action);
+    if (res && res.ok) {
+      removeRelanceLocally(relance.id);
+      toast.success(successLabel);
+    } else {
+      clearPending(relance.id);
+      toast.error(`Échec : ${(res && res.error) || 'erreur inconnue'}`);
+    }
+  };
+}
+
+const relanceCallbacks = {
+  onCopy:           handleRelanceCopy,
+  onCopyAndCalled:  handleRelanceCopyAndCalled,
+  onMarkCalled:     makeRelanceWriter('mark_called',    'Marqué traité'),
+  onMarkConverted:  makeRelanceWriter('mark_converted', 'Marqué converti'),
+  onMarkLost:       makeRelanceWriter('mark_lost',      'Marqué perdu'),
+  onMarkIgnored:    makeRelanceWriter('mark_ignored',   'Ignoré')
+};
+
+function buildRelancesSection() {
+  const section = document.createElement('section');
+  section.className = 'today-relances-section';
+
+  // ─── Header ───
+  const header = document.createElement('div');
+  header.className = 'today-relances-header';
+  const title = document.createElement('h2');
+  title.className = 'today-relances-title';
+  title.textContent = 'Actions à effectuer maintenant';
+  const subtitle = document.createElement('div');
+  subtitle.className = 'today-relances-subtitle';
+  subtitle.textContent = 'Relances clients générées par Sabrina';
+  header.appendChild(title);
+  header.appendChild(subtitle);
+  section.appendChild(header);
+
+  // ─── Counters ───
+  const totalOpen   = relancesCache.length;
+  const totalHaute  = relancesCache.filter(r => (r.priorite || '').toLowerCase() === 'haute').length;
+  const totalAppel  = relancesCache.filter(r => r.statut === 'à_appeler').length;
+  const totalMess   = relancesCache.filter(r => r.statut === 'à_relancer_messenger').length;
+  const totalValue  = relancesCache.reduce((s, r) => s + (r.valeur_estimee || 0), 0);
+
+  const counters = document.createElement('div');
+  counters.className = 'today-relances-counters';
+  counters.appendChild(makeCounter('Total ouvertes', String(totalOpen)));
+  counters.appendChild(makeCounter('Haute priorité', String(totalHaute), 'today-relance-counter--haute'));
+  counters.appendChild(makeCounter('À appeler',      String(totalAppel)));
+  counters.appendChild(makeCounter('À relancer Messenger', String(totalMess)));
+  counters.appendChild(makeCounter('Valeur estimée totale', formatMoney(totalValue)));
+  section.appendChild(counters);
+
+  // ─── Loading ───
+  if (relancesLoading && !relancesLoadedOnce) {
+    const loader = document.createElement('div');
+    loader.className = 'today-relances-loader';
+    loader.textContent = 'Chargement des relances...';
+    section.appendChild(loader);
+    return section;
+  }
+
+  // ─── Erreur ───
+  if (relancesError && relancesCache.length === 0) {
+    const errBox = document.createElement('div');
+    errBox.className = 'today-relances-error';
+    errBox.textContent = `Impossible de charger les relances : ${relancesError}`;
+    section.appendChild(errBox);
+    return section;
+  }
+
+  // ─── Empty ───
+  if (relancesCache.length === 0) {
+    const empty = document.createElement('div');
+    empty.className = 'today-relances-empty';
+    empty.textContent = 'Aucune relance à traiter';
+    section.appendChild(empty);
+    return section;
+  }
+
+  // ─── Liste cards (limitée à 10 par défaut) ───
+  const visible = relancesShowAll
+    ? relancesCache
+    : relancesCache.slice(0, RELANCES_DEFAULT_VISIBLE);
+
+  const list = document.createElement('div');
+  list.className = 'today-relances-list';
+  for (const r of visible) {
+    const cardState = { pendingAction: relancesPending.get(r.id) || null };
+    list.appendChild(renderRelanceCard(r, cardState, relanceCallbacks));
+  }
+  section.appendChild(list);
+
+  // ─── Voir plus ───
+  if (!relancesShowAll && relancesCache.length > RELANCES_DEFAULT_VISIBLE) {
+    const more = document.createElement('button');
+    more.type = 'button';
+    more.className = 'today-relances-show-more';
+    const remaining = relancesCache.length - RELANCES_DEFAULT_VISIBLE;
+    more.textContent = `Voir plus (${remaining})`;
+    more.addEventListener('click', () => {
+      relancesShowAll = true;
+      rerenderRelancesSection();
+    });
+    section.appendChild(more);
+  }
+
+  return section;
+}
+
+function makeCounter(label, value, extraClass = '') {
+  const wrap = document.createElement('div');
+  wrap.className = `today-relance-counter ${extraClass}`.trim();
+  const v = document.createElement('div');
+  v.className = 'today-relance-counter-v';
+  v.textContent = value;
+  const k = document.createElement('div');
+  k.className = 'today-relance-counter-k';
+  k.textContent = label;
+  wrap.appendChild(v);
+  wrap.appendChild(k);
+  return wrap;
+}
+
 export function initTodayPage() {
   if (initialized) return;
   initialized = true;
-  
+
   subscribe(renderTodayPage);
   refreshNow();
   startAutoRefresh();
+
+  // RELANCES : initial load + auto-refresh 2 min (skipped si demo)
+  if (!isDemoMode()) {
+    loadRelances();
+    startRelancesAutoRefresh();
+  }
 }
 
 function renderTodayPage({ queue, isLoading, error, lastFetchedAt }) {
   const target = document.querySelector('#page-today .page-body');
   if (!target) return;
-  
+
   if (new URL(location.href).searchParams.get('demo') === '1') return;
-  
+
   target.replaceChildren();
-  
+
+  // Capture la queue pour le résumé global (rerender quand relances changent).
+  lastQueueSnapshot = Array.isArray(queue) ? queue : [];
+
   updateUrgentBadge(queue);
+
+  // ─── Résumé du jour (slot tout en haut, avant tout) ───
+  const summarySlot = document.createElement('div');
+  summarySlot.id = 'today-summary-slot';
+  summarySlot.appendChild(buildTodaySummary(lastQueueSnapshot));
+  target.appendChild(summarySlot);
   
   // ─── Loading initial ───
   if (isLoading && (!lastFetchedAt || queue.length === 0)) {
@@ -135,7 +502,13 @@ function renderTodayPage({ queue, isLoading, error, lastFetchedAt }) {
   
   kpiSection.appendChild(cards);
   target.appendChild(kpiSection);
-  
+
+  // ─── Section RELANCES (indépendante de la queue Today) ───
+  const relancesSlot = document.createElement('div');
+  relancesSlot.id = 'today-relances-slot';
+  relancesSlot.appendChild(buildRelancesSection());
+  target.appendChild(relancesSlot);
+
   // ─── Liste des actions ───
   const listSection = document.createElement('div');
   listSection.className = 'today-list';
