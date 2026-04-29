@@ -145,6 +145,16 @@ export function renderRelanceCard(relance, state = {}, callbacks = {}) {
   }));
 
   actions.appendChild(makeActionBtn({
+    key: 'view_details',
+    className: 'btn-action btn-view',
+    label: '👁 Détails',
+    pendingLabel: '⏳ ...',
+    isPending,
+    pendingKey,
+    onClick: () => callbacks.onViewDetails && callbacks.onViewDetails(relance)
+  }));
+
+  actions.appendChild(makeActionBtn({
     key: 'copy_and_called',
     className: 'btn-action btn-relance-copy-called',
     label: '📋 Copier + Traité',
