@@ -105,6 +105,20 @@ export const api = {
   // Hobby 12-functions limit; previously a dedicated /api/actions/dispatch-control.
   setDispatch(id, status) {
     return request('PATCH', '/data/convo', { id, status });
+  },
+
+  // RELANCES — Today section "Actions à effectuer maintenant"
+  // Lecture co-localisée sur /api/data/convos (?source=relances) pour rester à 12 endpoints.
+  getRelances() {
+    return request('GET', '/data/convos', null, { source: 'relances' });
+  },
+
+  // RELANCES — Update statut.
+  // Action ∈ { 'mark_called', 'mark_converted', 'mark_lost', 'mark_ignored' }
+  // Co-localisé sur /api/actions/update (target='relance') pour rester à 12 endpoints.
+  // Seul le champ `statut` est modifié côté Airtable (allowlist stricte côté serveur).
+  updateRelance(id, action) {
+    return request('POST', '/actions/update', { target: 'relance', id, action });
   }
 };
 
