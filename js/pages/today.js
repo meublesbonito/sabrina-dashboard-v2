@@ -55,6 +55,11 @@ let relancesAutoRefreshTimer = null;
 // when only relances change (no queue update). Updated in renderTodayPage().
 let lastQueueSnapshot = [];
 
+// PSID → CONVERSATIONS record id cache (read-only lookup).
+// Populated lazily on the first "Détails" click per RELANCE psid.
+// No invalidation: a psid → recXXX mapping is stable for the session lifetime.
+const psidToConvoIdCache = new Map();
+
 const PRIORITY_RANK = { haute: 0, moyenne: 1, basse: 2 };
 
 function sortRelances(arr) {
@@ -269,8 +274,48 @@ function makeRelanceWriter(action, successLabel) {
   };
 }
 
+// Read-only handler — opens the existing drawer with the convo behind a psid.
+// No Airtable write. No new endpoint. No mutation of RELANCES nor CONVERSATIONS.
+async function handleRelanceViewDetails(relance) {
+  if (!relance || !relance.psid) {
+    toast.error('Conversation introuvable');
+    return;
+  }
+  if (relancesPending.has(relance.id)) return;
+  setPending(relance.id, 'view_details');
+
+  try {
+    let convoId = psidToConvoIdCache.get(relance.psid);
+    let convoMeta = null;
+
+    if (!convoId) {
+      const res = await api.searchConvos(relance.psid, { limit: 1 });
+      const found = (res && res.ok && Array.isArray(res.data)) ? res.data[0] : null;
+      // Defensive: searchConvos matches multiple fields. Require exact psid match.
+      if (!found || String(found.psid || '') !== String(relance.psid)) {
+        toast.error('Conversation introuvable');
+        clearPending(relance.id);
+        return;
+      }
+      convoId = found.id;
+      convoMeta = found;
+      psidToConvoIdCache.set(relance.psid, convoId);
+    }
+
+    openDrawerForConvo(convoId, {
+      psid: relance.psid,
+      customer_name: (convoMeta && convoMeta.customer_name) || relance.psid
+    });
+  } catch {
+    toast.error('Conversation introuvable');
+  } finally {
+    clearPending(relance.id);
+  }
+}
+
 const relanceCallbacks = {
   onCopy:           handleRelanceCopy,
+  onViewDetails:    handleRelanceViewDetails,
   onCopyAndCalled:  handleRelanceCopyAndCalled,
   onMarkCalled:     makeRelanceWriter('mark_called',    'Marqué traité'),
   onMarkConverted:  makeRelanceWriter('mark_converted', 'Marqué converti'),
